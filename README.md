@@ -16,6 +16,17 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Lodgify Integration
+
+To switch a listing from the local booking flow to Lodgify:
+
+1. Run the new Prisma migration so the Lodgify fields are added to `Listing`.
+2. Add `LODGIFY_API_KEY` to your environment so the app can fetch guest reservations.
+3. Optionally set `LODGIFY_API_BASE_URL`, `LODGIFY_RESERVATIONS_PATH`, and `LODGIFY_RESERVATION_EMAIL_PARAM` if your Lodgify account uses a different reservations endpoint or guest-email filter name.
+4. In Admin -> Listings, fill in `Lodgify Property ID`, `Lodgify Booking URL`, and `Lodgify Widget Embed Code`.
+
+When a listing has Lodgify widget data, the listing page shows the Lodgify widget instead of the local booking bar. Profile and trips pages will then try to load reservations from Lodgify using the signed-in user's email address.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

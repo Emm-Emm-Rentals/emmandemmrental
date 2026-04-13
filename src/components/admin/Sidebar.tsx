@@ -9,6 +9,7 @@ import {
     Home,
     CalendarCheck,
     CreditCard,
+    FileText,
     ScrollText,
     Receipt,
     Settings,
@@ -27,6 +28,7 @@ const Sidebar = () => {
         { label: 'Listings', href: '/admin/listings', icon: <Home size={20} /> },
         { label: 'Reservations', href: '/admin/reservations', icon: <CalendarCheck size={20} /> },
         { label: 'Payments', href: '/admin/payments', icon: <CreditCard size={20} /> },
+        { label: 'Policies', href: '/admin/policies', icon: <FileText size={20} /> },
         { label: 'Tax Profiles', href: '/admin/tax-profiles', icon: <Receipt size={20} /> },
         { label: 'Audit Logs', href: '/admin/audit-logs', icon: <ScrollText size={20} /> },
     ];
@@ -35,7 +37,7 @@ const Sidebar = () => {
         <>
             {/* Mobile Toggle */}
             <button
-                className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-white border border-gray-200 rounded-lg shadow-sm"
+                className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg border border-slate-200 bg-white shadow-sm text-slate-900"
                 onClick={() => setIsOpen(!isOpen)}
             >
                 {isOpen ? <X size={20} /> : <Menu size={20} />}
@@ -43,14 +45,15 @@ const Sidebar = () => {
 
             {/* Sidebar */}
             <div className={`
-        fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-gray-200 transition-transform duration-300 ease-in-out flex flex-col
+        fixed inset-y-0 left-0 z-40 w-64 bg-slate-950 text-slate-200 border-r border-slate-800 transition-transform duration-300 ease-in-out flex flex-col
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
         lg:translate-x-0 lg:static lg:inset-y-0
       `}>
                 {/* Fixed Header */}
-                <div className="p-6 border-b border-gray-100 flex-shrink-0">
-                    <h1 className="text-xl font-bold text-gray-900">Admin Panel</h1>
-                    <p className="text-xs text-gray-500 mt-1">Property Management</p>
+                <div className="p-6 border-b border-slate-800 flex-shrink-0">
+                    <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Emm Admin</p>
+                    <h1 className="mt-2 text-xl font-semibold text-white">Property Management</h1>
+                    <p className="text-xs text-slate-400 mt-1">Operations, bookings, and finance.</p>
                 </div>
 
                 {/* Scrollable Navigation Content */}
@@ -62,10 +65,10 @@ const Sidebar = () => {
                                 key={item.href}
                                 href={item.href}
                                 className={`
-                    flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200
+                    flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 border
                     ${isActive
-                                        ? 'bg-zinc-900 text-white shadow-md'
-                                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}
+                                        ? 'bg-slate-800 text-white border-slate-700 shadow-sm'
+                                        : 'text-slate-300 border-transparent hover:bg-slate-900 hover:text-white hover:border-slate-800'}
                   `}
                             >
                                 {item.icon}
@@ -76,17 +79,17 @@ const Sidebar = () => {
                 </nav>
 
                 {/* Fixed Footer */}
-                <div className="p-4 border-t border-gray-100 space-y-1 flex-shrink-0">
+                <div className="p-4 border-t border-slate-800 space-y-1 flex-shrink-0">
                         <Link
                             href="/"
-                            className="flex items-center gap-3 px-4 py-3 text-gray-600 hover:bg-gray-50 rounded-xl transition-all"
+                            className="flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-900 rounded-xl transition-all border border-transparent hover:border-slate-800"
                         >
                             <Settings size={20} />
                             <span className="font-medium">Return to Site</span>
                         </Link>
                         <button
                             onClick={() => signOut({ callbackUrl: '/admin/login' })}
-                            className="w-full flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                            className="w-full flex items-center gap-3 px-4 py-3 text-red-300 hover:bg-red-950/40 rounded-xl transition-all border border-transparent hover:border-red-900/50"
                         >
                             <X size={20} />
                             <span className="font-medium">Log Out</span>

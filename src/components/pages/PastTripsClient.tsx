@@ -7,10 +7,12 @@ import { useRouter } from 'next/navigation';
 
 type PastBooking = {
   id: string;
-  listingId: string;
+  listingId: string | null;
   startDate: string;
   endDate: string;
   hasReview: boolean;
+  reviewable: boolean;
+  source?: 'lodgify' | 'local';
   listing: {
     title: string;
     imageSrc: string;
@@ -40,7 +42,7 @@ export default function PastTripsClient({
 
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!reviewBooking) return;
+    if (!reviewBooking?.listingId) return;
     setReviewError('');
 
     if (!reviewComment.trim() || reviewComment.trim().length < 10) {
@@ -91,7 +93,7 @@ export default function PastTripsClient({
           <div className="space-y-4">
             {bookings.map((booking) => (
               <div key={booking.id} className="bg-white border border-gray-100 rounded-2xl p-5 flex flex-col md:flex-row md:items-center gap-4 shadow-sm">
-                <img src={booking.listing?.imageSrc} alt={booking.listing?.title} className="w-full md:w-24 h-20 rounded-xl object-cover" />
+                <img src={booking.listing?.imageSrc || '/banner.png'} alt={booking.listing?.title} className="w-full md:w-24 h-20 rounded-xl object-cover" />
                 <div className="flex-1">
                   <p className="font-semibold text-gray-900">{booking.listing?.title}</p>
                   <p className="text-xs text-gray-500 mt-1">
@@ -100,6 +102,10 @@ export default function PastTripsClient({
                 </div>
                 {booking.hasReview ? (
                   <div className="text-xs font-semibold text-green-600 bg-green-50 px-3 py-2 rounded-full">Reviewed</div>
+                ) : !booking.reviewable ? (
+                  <div className="text-xs font-semibold text-gray-500 bg-gray-50 px-3 py-2 rounded-full">
+                    {booking.source === 'lodgify' ? 'External booking' : 'Not reviewable'}
+                  </div>
                 ) : (
                   <button
                     onClick={() => handleOpenReview(booking)}

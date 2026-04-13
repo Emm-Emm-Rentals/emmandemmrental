@@ -42,6 +42,7 @@ model User {
   sessions      Session[]
   listings      Listing[]
   reservations  Reservation[]
+  lodgifyBookingSessions LodgifyBookingSession[]
   reviews       Review[]
   adminAuditLogs AdminAuditLog[] @relation("AdminAuditLogs")
 }
@@ -141,6 +142,7 @@ model Listing {
   
   // Availability and minimum stay
   minStayNights         Int?      @default(1)
+  dynamicPricingRules   Json[]    @default([])
   maxGuestsAllowed      Int?
   
   // Instant book
@@ -154,9 +156,14 @@ model Listing {
   
   // Subtitle
   subtitle              String?
+  lodgifyPropertyId     String?
+  lodgifyRoomTypeId     String?
+  lodgifyBookingUrl     String?
+  lodgifyWidgetEmbed    String?   @db.Text
 
   user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   reservations          Reservation[]
+  lodgifyBookingSessions LodgifyBookingSession[]
   reviews               Review[]
   images                ListingImage[]
   specifications        ListingSpecification[]
@@ -164,6 +171,27 @@ model Listing {
   bedrooms              ListingBedroom[]
   gallerySections       ListingGallerySection[]
   taxProfile            TaxProfile? @relation(fields: [taxProfileId], references: [id], onDelete: SetNull)
+}
+
+model LodgifyBookingSession {
+  id                   String   @id @default(cuid())
+  token                String   @unique
+  userId               String
+  listingId            String
+  lodgifyPropertyId    String?
+  lodgifyReservationId String?  @unique
+  guestEmail           String?
+  redirectPath         String?
+  createdAt            DateTime @default(now())
+  expiresAt            DateTime
+  claimedAt            DateTime?
+
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listing              Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([listingId, createdAt])
+  @@index([lodgifyPropertyId, createdAt])
 }
 
 model ListingImage {
@@ -256,6 +284,31 @@ model Reservation {
   stripePaymentIntentId String?
   stripeChargeId String?
   stripeBalanceTransactionId String?
+  bookingSource String @default("direct")
+  primaryGuestName String?
+  primaryGuestEmail String?
+  primaryGuestPhone String?
+  primaryGuestLocale String?
+  primaryGuestStreetAddress1 String?
+  primaryGuestStreetAddress2 String?
+  primaryGuestCity String?
+  primaryGuestState String?
+  primaryGuestPostalCode String?
+  primaryGuestCountryCode String?
+  agreementPolicyId String?
+  agreementPolicyVersion Int?
+  agreementPolicyTitle String?
+  agreementAcceptedAt DateTime?
+  paymentPolicyId String?
+  paymentPolicyVersion Int?
+  paymentPolicyTitle String?
+  paymentPolicyAcceptedAt DateTime?
+  lodgifyPropertyId String?
+  lodgifyRoomTypeId String?
+  lodgifyReservationId String? @unique
+  lodgifySyncStatus String @default("pending")
+  lodgifySyncError String? @db.Text
+  lodgifySyncedAt DateTime?
   paymentStatus String? @default("unpaid")
   paymentCurrency String? @default("usd")
   amountPaid Int? @default(0)
@@ -267,6 +320,16 @@ model Reservation {
   refundedAmount Int? @default(0)
   stripeRefundIds String[] @default([])
   refundHistory Json[] @default([])
+  // Deposit / balance-due fields (policy: 50% at booking, balance 60 days before arrival)
+  paymentType  String  @default("full")         // "full" | "deposit"
+  depositAmount Int?                             // cents charged at booking (50% when deposit)
+  balanceDueAmount Int?                          // cents remaining (0 when full payment)
+  balanceDueDate DateTime?                       // 60 days before arrival
+  balancePaid Boolean @default(false)
+  balancePaidAt DateTime?
+  balanceStripePaymentIntentId String?
+  stripeCustomerId String?                       // Stripe customer for off-session balance charge
+  stripePaymentMethodId String?                  // saved card for balance charge
   createdAt  DateTime @default(now())
 
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -290,6 +353,20 @@ model TaxProfile {
 
   lines         TaxProfileLine[]
   listings      Listing[]
+}
+
+model PolicyDocument {
+  id        String   @id @default(cuid())
+  policyKey String
+  title     String
+  content   String   @db.Text
+  version   Int
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([policyKey, version])
+  @@index([policyKey, isActive])
 }
 
 model TaxProfileLine {

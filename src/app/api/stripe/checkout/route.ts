@@ -4,9 +4,11 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { stripe } from "@/lib/stripe";
 import { calculateNights, parseDate } from "@/lib/booking";
-import { calculatePricingBreakdown } from "@/lib/pricing";
+import { calculateStayPricingBreakdown } from "@/lib/pricing";
 
 export const runtime = "nodejs";
+
+const DEPOSIT_THRESHOLD_DAYS = 60; // bookings more than this many days out get the 50% deposit flow
 
 const getAppUrl = (request: NextRequest) => {
     const envUrl = process.env.NEXT_PUBLIC_APP_URL;
@@ -17,6 +19,20 @@ const getAppUrl = (request: NextRequest) => {
     return host ? `https://${host}` : "http://localhost:3000";
 };
 
+/** Returns the number of full calendar days between today (midnight) and the arrival date. */
+function daysUntil(arrival: Date): number {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const arrivalDay = new Date(arrival);
+    arrivalDay.setHours(0, 0, 0, 0);
+    return Math.floor((arrivalDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+/** Returns the date that is `days` days before `date`. */
+function daysBefore(date: Date, days: number): Date {
+    return new Date(date.getTime() - days * 24 * 60 * 60 * 1000);
+}
+
 export async function POST(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions);
@@ -25,6 +41,7 @@ export async function POST(request: NextRequest) {
         }
 
         const userId = (session.user as any).id as string;
+        const userEmail = (session.user as any).email as string | undefined;
         const body = await request.json();
         const {
             listingId,
@@ -34,6 +51,23 @@ export async function POST(request: NextRequest) {
             children = 0,
             infants = 0,
             pets = 0,
+            primaryGuestName = null,
+            primaryGuestEmail = null,
+            primaryGuestPhone = null,
+            primaryGuestLocale = null,
+            primaryGuestStreetAddress1 = null,
+            primaryGuestStreetAddress2 = null,
+            primaryGuestCity = null,
+            primaryGuestState = null,
+            primaryGuestPostalCode = null,
+            primaryGuestCountryCode = null,
+            agreementPolicyId = null,
+            agreementPolicyVersion = null,
+            agreementPolicyTitle = null,
+            paymentPolicyId = null,
+            paymentPolicyVersion = null,
+            paymentPolicyTitle = null,
+            payFullAmount = false, // guest can opt to pay in full even when deposit is eligible
         } = body;
 
         if (!listingId || !startDate || !endDate) {
@@ -62,6 +96,7 @@ export async function POST(request: NextRequest) {
                 serviceFee: true,
                 taxPercentage: true,
                 minStayNights: true,
+                dynamicPricingRules: true,
                 locationValue: true,
                 taxProfile: {
                     include: {
@@ -84,17 +119,18 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: `Minimum stay is ${minStay} nights` }, { status: 400 });
         }
 
-        const pricePerNight = listing.basePricePerNight ?? listing.price ?? 0;
         const cleaningFee = listing.cleaningFee ?? 0;
         const serviceFee = listing.serviceFee ?? 0;
-        const pricing = calculatePricingBreakdown({
-            nights,
-            pricePerNight,
+        const pricing = calculateStayPricingBreakdown({
+            startDate: parsedStart,
+            endDate: parsedEnd,
+            basePricePerNight: listing.basePricePerNight ?? listing.price ?? 0,
             cleaningFee,
             serviceFee,
             taxPercentage: listing.taxPercentage ?? 0,
             locationValue: listing.locationValue,
             taxProfile: listing.taxProfile || undefined,
+            dynamicPricingRules: listing.dynamicPricingRules,
         });
 
         const currency = (process.env.STRIPE_CURRENCY || "usd").toLowerCase();
@@ -106,65 +142,142 @@ export async function POST(request: NextRequest) {
                 : `${appUrl}${listing.imageSrc.startsWith("/") ? "" : "/"}${listing.imageSrc}`)
             : null;
 
-        const checkoutSession = await stripe.checkout.sessions.create({
-            mode: "payment",
-            payment_method_types: ["card"],
-            customer_email: (session.user as any).email || undefined,
-            line_items: [
-                {
-                    price_data: {
-                        currency,
-                        product_data: {
-                            name: listing.title,
-                            description: `${nights} night stay`,
-                            images: imageUrl ? [imageUrl] : undefined,
-                        },
-                        unit_amount: Math.round(pricePerNight * 100),
-                    },
-                    quantity: nights,
+        // --- Deposit vs Full Payment Logic (per policy) ---
+        const arrivalDaysAway = daysUntil(parsedStart);
+        const isDepositBooking = arrivalDaysAway > DEPOSIT_THRESHOLD_DAYS && !payFullAmount;
+
+        const totalCents = Math.round(pricing.total * 100);
+        // 50% deposit rounded down to nearest cent; balance is the remainder
+        const depositCents = isDepositBooking ? Math.floor(totalCents / 2) : totalCents;
+        const balanceCents = isDepositBooking ? totalCents - depositCents : 0;
+        const balanceDueDate = isDepositBooking
+            ? daysBefore(parsedStart, DEPOSIT_THRESHOLD_DAYS)
+            : null;
+        const paymentType = isDepositBooking ? "deposit" : "full";
+
+        const sharedMetadata: Record<string, string> = {
+            userId,
+            listingId,
+            startDate,
+            endDate,
+            adults: String(adults),
+            children: String(children),
+            infants: String(infants),
+            pets: String(pets),
+            primaryGuestName: String(primaryGuestName || ""),
+            primaryGuestEmail: String(primaryGuestEmail || ""),
+            primaryGuestPhone: String(primaryGuestPhone || ""),
+            primaryGuestLocale: String(primaryGuestLocale || ""),
+            primaryGuestStreetAddress1: String(primaryGuestStreetAddress1 || ""),
+            primaryGuestStreetAddress2: String(primaryGuestStreetAddress2 || ""),
+            primaryGuestCity: String(primaryGuestCity || ""),
+            primaryGuestState: String(primaryGuestState || ""),
+            primaryGuestPostalCode: String(primaryGuestPostalCode || ""),
+            primaryGuestCountryCode: String(primaryGuestCountryCode || ""),
+            agreementPolicyId: String(agreementPolicyId || ""),
+            agreementPolicyVersion: String(agreementPolicyVersion || ""),
+            agreementPolicyTitle: String(agreementPolicyTitle || ""),
+            paymentPolicyId: String(paymentPolicyId || ""),
+            paymentPolicyVersion: String(paymentPolicyVersion || ""),
+            paymentPolicyTitle: String(paymentPolicyTitle || ""),
+            paymentType,
+            depositAmountCents: String(depositCents),
+            balanceDueAmountCents: String(balanceCents),
+            balanceDueDate: balanceDueDate ? balanceDueDate.toISOString() : "",
+        };
+
+        const cancelUrl = `${appUrl}/booking/${listingId}?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}&adults=${adults}&children=${children}&infants=${infants}&pets=${pets}`;
+
+        let checkoutSession;
+
+        if (isDepositBooking) {
+            // Deposit flow: charge 50%, save the card for the balance charge 60 days before arrival.
+            // We use customer_creation: 'always' so Stripe creates a Customer and we can reuse the card.
+            const balanceDateFormatted = balanceDueDate
+                ? balanceDueDate.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+                : "";
+
+            checkoutSession = await stripe.checkout.sessions.create({
+                mode: "payment",
+                payment_method_types: ["card"],
+                customer_email: userEmail || undefined,
+                customer_creation: "always",
+                payment_intent_data: {
+                    // Save the card off-session so we can charge the balance later without the guest being present
+                    setup_future_usage: "off_session",
+                    description: `50% deposit — ${listing.title} (${nights} night stay). Balance of $${(balanceCents / 100).toFixed(2)} auto-charged on ${balanceDateFormatted}.`,
                 },
-                ...(cleaningFee > 0
-                    ? [{
+                line_items: [
+                    {
                         price_data: {
                             currency,
-                            product_data: { name: "Cleaning fee" },
-                            unit_amount: Math.round(cleaningFee * 100),
+                            product_data: {
+                                name: `50% Deposit — ${listing.title}`,
+                                description: `${nights} night stay · Balance of $${(balanceCents / 100).toFixed(2)} auto-charged on ${balanceDateFormatted}`,
+                                images: imageUrl ? [imageUrl] : undefined,
+                            },
+                            unit_amount: depositCents,
                         },
                         quantity: 1,
-                    }]
-                    : []),
-                ...(serviceFee > 0
-                    ? [{
-                        price_data: {
-                            currency,
-                            product_data: { name: "Service fee" },
-                            unit_amount: Math.round(serviceFee * 100),
-                        },
-                        quantity: 1,
-                    }]
-                    : []),
-                ...pricing.taxLines.map((taxLine) => ({
-                    price_data: {
-                        currency,
-                        product_data: { name: `${taxLine.label} (${taxLine.rate}%)` },
-                        unit_amount: Math.round(taxLine.amount * 100),
                     },
-                    quantity: 1,
-                })),
-            ],
-            success_url: `${appUrl}/booking/success?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${appUrl}/booking/${listingId}?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}&adults=${adults}&children=${children}&infants=${infants}&pets=${pets}`,
-            metadata: {
-                userId,
-                listingId,
-                startDate,
-                endDate,
-                adults: String(adults),
-                children: String(children),
-                infants: String(infants),
-                pets: String(pets),
-            },
-        });
+                ],
+                success_url: `${appUrl}/booking/success?session_id={CHECKOUT_SESSION_ID}`,
+                cancel_url: cancelUrl,
+                metadata: sharedMetadata,
+            });
+        } else {
+            // Full payment: charge everything now (booking is within 60 days of arrival)
+            checkoutSession = await stripe.checkout.sessions.create({
+                mode: "payment",
+                payment_method_types: ["card"],
+                customer_email: userEmail || undefined,
+                line_items: [
+                    {
+                        price_data: {
+                            currency,
+                            product_data: {
+                                name: listing.title,
+                                description: `${nights} night stay`,
+                                images: imageUrl ? [imageUrl] : undefined,
+                            },
+                            unit_amount: Math.round(pricing.nightlySubtotal * 100),
+                        },
+                        quantity: 1,
+                    },
+                    ...(cleaningFee > 0
+                        ? [{
+                            price_data: {
+                                currency,
+                                product_data: { name: "Cleaning fee" },
+                                unit_amount: Math.round(cleaningFee * 100),
+                            },
+                            quantity: 1,
+                        }]
+                        : []),
+                    ...(serviceFee > 0
+                        ? [{
+                            price_data: {
+                                currency,
+                                product_data: { name: "Service fee" },
+                                unit_amount: Math.round(serviceFee * 100),
+                            },
+                            quantity: 1,
+                        }]
+                        : []),
+                    ...pricing.taxLines.map((taxLine) => ({
+                        price_data: {
+                            currency,
+                            product_data: { name: `${taxLine.label} (${taxLine.rate}%)` },
+                            unit_amount: Math.round(taxLine.amount * 100),
+                        },
+                        quantity: 1,
+                    })),
+                ],
+                success_url: `${appUrl}/booking/success?session_id={CHECKOUT_SESSION_ID}`,
+                cancel_url: cancelUrl,
+                metadata: sharedMetadata,
+            });
+        }
 
         return NextResponse.json({ url: checkoutSession.url });
     } catch (error) {

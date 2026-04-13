@@ -50,29 +50,29 @@ export default function AdminAuditLogsPage() {
     if (isLoading) {
         return (
             <div className="flex items-center justify-center min-h-[400px]">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
             </div>
         );
     }
 
     return (
-        <div>
-            <div className="mb-8 flex flex-col gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Audit Logs</h1>
-                    <p className="text-gray-500">Track administrative actions for accountability.</p>
-                </div>
-                <div className="bg-white border border-gray-100 rounded-2xl p-4 flex flex-col lg:flex-row gap-3 lg:items-center">
+        <div className="space-y-6">
+            <div className="flex flex-col gap-2">
+                <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Audit Logs</h1>
+                <p className="text-sm text-slate-500">Track administrative actions for accountability.</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
                     <input
                         value={filters.q}
                         onChange={(e) => setFilters((prev) => ({ ...prev, q: e.target.value }))}
                         placeholder="Search by admin email, target ID, or action"
-                        className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm text-black"
+                        className="flex-1 h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-slate-900 outline-none"
                     />
                     <select
                         value={filters.action}
                         onChange={(e) => setFilters((prev) => ({ ...prev, action: e.target.value }))}
-                        className="border border-gray-200 rounded-xl px-3 py-2 text-sm text-black"
+                        className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 focus:bg-white focus:border-slate-900 outline-none"
                     >
                         <option value="">Action</option>
                         <option value="set_role">set_role</option>
@@ -87,52 +87,52 @@ export default function AdminAuditLogsPage() {
                         type="date"
                         value={filters.dateFrom}
                         onChange={(e) => setFilters((prev) => ({ ...prev, dateFrom: e.target.value }))}
-                        className="border border-gray-200 rounded-xl px-3 py-2 text-sm text-black"
+                        className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 focus:bg-white focus:border-slate-900 outline-none"
                     />
                     <input
                         type="date"
                         value={filters.dateTo}
                         onChange={(e) => setFilters((prev) => ({ ...prev, dateTo: e.target.value }))}
-                        className="border border-gray-200 rounded-xl px-3 py-2 text-sm text-black"
+                        className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 focus:bg-white focus:border-slate-900 outline-none"
                     />
                 </div>
             </div>
 
             {logs.length === 0 ? (
-                <div className="py-20 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-                    <p className="text-gray-400 font-medium mb-4">No audit logs found.</p>
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 py-20 text-center">
+                    <p className="text-sm font-medium text-slate-500">No audit logs found.</p>
                 </div>
             ) : (
-                <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
-                    <div className="grid grid-cols-12 gap-4 px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-100">
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                    <div className="grid grid-cols-12 gap-4 border-b border-slate-200 px-6 py-4 text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">
                         <div className="col-span-3">Admin</div>
                         <div className="col-span-3">Action</div>
                         <div className="col-span-3">Target</div>
                         <div className="col-span-3">Time</div>
                     </div>
-                    <div className="divide-y divide-gray-100">
+                    <div className="divide-y divide-slate-200">
                         {logs.map((log) => (
                             <div key={log.id} className="grid grid-cols-12 gap-4 px-6 py-4 items-center">
-                                <div className="col-span-3 text-sm  text-gray-700">
-                                    <p className="font-semibold text-gray-900">{log.admin?.name || 'Admin'}</p>
-                                    <p className="text-xs text-gray-500">{log.admin?.email}</p>
+                                <div className="col-span-3 text-sm text-slate-700">
+                                    <p className="font-medium text-slate-900">{log.admin?.name || 'Admin'}</p>
+                                    <p className="text-xs text-slate-500">{log.admin?.email}</p>
                                 </div>
-                                <div className="col-span-3 text-sm  text-gray-700">
-                                    <p className="font-semibold text-gray-900">{log.action}</p>
-                                    <p className="text-xs text-gray-500">{log.targetType || 'user'}</p>
+                                <div className="col-span-3 text-sm text-slate-700">
+                                    <p className="font-medium text-slate-900">{log.action}</p>
+                                    <p className="text-xs text-slate-500">{log.targetType || 'user'}</p>
                                 </div>
-                                <div className="col-span-3 text-xs text-gray-600">
+                                <div className="col-span-3 text-xs text-slate-600">
                                     {log.targetUser ? (
                                         <div>
-                                            <p className="font-semibold text-gray-900">{log.targetUser.name || 'User'}</p>
-                                            <p className="text-xs text-gray-500">{log.targetUser.email || ''}</p>
-                                            <p className="text-[10px] text-gray-400">{log.targetId}</p>
+                                            <p className="font-medium text-slate-900">{log.targetUser.name || 'User'}</p>
+                                            <p className="text-xs text-slate-500">{log.targetUser.email || ''}</p>
+                                            <p className="text-[10px] text-slate-400">{log.targetId}</p>
                                         </div>
                                     ) : (
-                                        <span className="text-gray-500">{log.targetId || '—'}</span>
+                                        <span className="text-slate-500">{log.targetId || '—'}</span>
                                     )}
                                 </div>
-                                <div className="col-span-3 text-xs text-gray-500">
+                                <div className="col-span-3 text-xs text-slate-500">
                                     {formatDateTime(log.createdAt)}
                                 </div>
                             </div>
@@ -143,21 +143,21 @@ export default function AdminAuditLogsPage() {
 
             {total > 0 && (
                 <div className="mt-8 flex items-center justify-between">
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-slate-500">
                         Showing page {page} of {totalPages} · {total} total logs
                     </p>
                     <div className="flex items-center gap-2">
                         <button
                             onClick={() => setPage((p) => Math.max(1, p - 1))}
                             disabled={page === 1}
-                            className="px-3 py-2 text-xs font-semibold border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                            className="px-3 py-2 text-xs font-medium border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50"
                         >
                             Previous
                         </button>
                         <button
                             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                             disabled={page >= totalPages}
-                            className="px-3 py-2 text-xs font-semibold border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                            className="px-3 py-2 text-xs font-medium border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50"
                         >
                             Next
                         </button>

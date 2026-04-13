@@ -85,23 +85,23 @@ export default function UsersPage() {
     }
 
     return (
-        <div>
-            <div className="flex flex-col gap-4 mb-8">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
-                    <p className="text-gray-500">Manage users, roles, access, and activity.</p>
-                </div>
-                <div className="bg-white border border-gray-100 rounded-2xl p-4 flex flex-col lg:flex-row gap-3 lg:items-center">
+        <div className="space-y-6">
+            <div className="flex flex-col gap-2">
+                <h1 className="text-3xl font-semibold tracking-tight text-slate-900">User Management</h1>
+                <p className="text-sm text-slate-500">Manage users, roles, access, and activity.</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
                     <input
                         value={filters.q}
                         onChange={(e) => setFilters((prev) => ({ ...prev, q: e.target.value }))}
                         placeholder="Search by name, email, or phone"
-                        className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm text-black"
+                        className="flex-1 h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-slate-900 outline-none"
                     />
                     <select
                         value={filters.role}
                         onChange={(e) => setFilters((prev) => ({ ...prev, role: e.target.value }))}
-                        className="border border-gray-200 rounded-xl px-3 py-2 text-sm text-black"
+                        className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 focus:bg-white focus:border-slate-900 outline-none"
                     >
                         <option value="">Role</option>
                         <option value="USER">USER</option>
@@ -111,7 +111,7 @@ export default function UsersPage() {
                     <select
                         value={filters.status}
                         onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}
-                        className="border border-gray-200 rounded-xl px-3 py-2 text-sm text-black"
+                        className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 focus:bg-white focus:border-slate-900 outline-none"
                     >
                         <option value="">Status</option>
                         <option value="ACTIVE">ACTIVE</option>
@@ -121,24 +121,24 @@ export default function UsersPage() {
                 </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
                         <thead>
-                            <tr className="bg-gray-50 border-b border-gray-100">
-                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">User</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Role</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Contact</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Joined</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Actions</th>
+                            <tr className="border-b border-slate-200 bg-slate-50">
+                                <th className="px-6 py-4 text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">User</th>
+                                <th className="px-6 py-4 text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">Role</th>
+                                <th className="px-6 py-4 text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">Contact</th>
+                                <th className="px-6 py-4 text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">Joined</th>
+                                <th className="px-6 py-4 text-[11px] font-medium uppercase tracking-[0.18em] text-right text-slate-500">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100">
+                        <tbody className="divide-y divide-slate-200">
                             {users.map((user) => (
-                                <tr key={user.id} className="hover:bg-gray-50 transition-colors">
+                                <tr key={user.id} className="hover:bg-slate-50 transition-colors">
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-600 font-bold overflow-hidden">
+                                            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-medium overflow-hidden">
                                                 {user.image ? (
                                                     <img src={user.image} alt="" className="w-full h-full object-cover" />
                                                 ) : (
@@ -146,36 +146,36 @@ export default function UsersPage() {
                                                 )}
                                             </div>
                                             <div>
-                                                <div className="font-bold text-gray-900">{user.name || 'Anonymous'}</div>
-                                                <div className="text-xs text-gray-500">{user.email || 'No email'}</div>
+                                                <div className="font-medium text-slate-900">{user.name || 'Anonymous'}</div>
+                                                <div className="text-xs text-slate-500">{user.email || 'No email'}</div>
                                             </div>
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${user.role === 'ADMIN' ? 'bg-purple-50 text-purple-700' :
-                                                user.role === 'HOST' ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-600'
+                                        <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${user.role === 'ADMIN' ? 'bg-slate-900 text-white' :
+                                                user.role === 'HOST' ? 'bg-slate-100 text-slate-700' : 'bg-slate-100 text-slate-600'
                                             }`}>
                                             {user.role}
                                         </span>
-                                        <div className={`mt-2 inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${user.status === 'DEACTIVATED' ? 'bg-red-50 text-red-600' : user.status === 'DELETED' ? 'bg-zinc-100 text-zinc-500' : 'bg-emerald-50 text-emerald-600'}`}>
+                                        <div className={`mt-2 inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-[0.16em] ${user.status === 'DEACTIVATED' ? 'bg-red-50 text-red-600' : user.status === 'DELETED' ? 'bg-slate-100 text-slate-500' : 'bg-emerald-50 text-emerald-600'}`}>
                                             {user.status || 'ACTIVE'}
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
                                         <div className="flex flex-col gap-1">
                                             {user.phoneNumber && (
-                                                <div className="flex items-center gap-2 text-xs text-gray-600">
+                                                <div className="flex items-center gap-2 text-xs text-slate-600">
                                                     <Phone size={12} /> {user.phoneNumber}
                                                 </div>
                                             )}
                                             {user.email && (
-                                                <div className="flex items-center gap-2 text-xs text-gray-600">
+                                                <div className="flex items-center gap-2 text-xs text-slate-600">
                                                     <Mail size={12} /> Email Verified
                                                 </div>
                                             )}
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 text-sm text-black text-gray-500">
+                                    <td className="px-6 py-4 text-sm text-slate-500">
                                         <div className="flex items-center gap-2">
                                             <Calendar size={14} />
                                             {new Date(user.createdAt).toLocaleDateString()}
@@ -185,10 +185,10 @@ export default function UsersPage() {
                                         <div className="flex items-center justify-end gap-2">
                                             <button
                                                 onClick={() => loadUserDetails(user.id)}
-                                                className="px-3 py-2 text-xs text-black font-semibold border border-gray-200 rounded-lg hover:bg-gray-50"
-                                            >
-                                                View
-                                            </button>
+                                            className="px-3 py-2 text-xs font-medium border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-700"
+                                        >
+                                            View
+                                        </button>
                                             <button className="p-2 hover:bg-white rounded-lg transition-colors border border-transparent hover:border-gray-200">
                                                 <MoreVertical size={16} className="text-gray-400" />
                                             </button>
@@ -203,21 +203,21 @@ export default function UsersPage() {
 
             {total > 0 && (
                 <div className="mt-6 flex items-center justify-between">
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-slate-500">
                         Showing page {page} of {totalPages} · {total} total users
                     </p>
                     <div className="flex items-center gap-2">
                         <button
                             onClick={() => setPage((p) => Math.max(1, p - 1))}
                             disabled={page === 1}
-                            className="px-3 py-2 text-xs font-semibold border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                            className="px-3 py-2 text-xs font-medium border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50"
                         >
                             Previous
                         </button>
                         <button
                             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                             disabled={page >= totalPages}
-                            className="px-3 py-2 text-xs font-semibold border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                            className="px-3 py-2 text-xs font-medium border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50"
                         >
                             Next
                         </button>
@@ -226,22 +226,22 @@ export default function UsersPage() {
             )}
 
             {selectedUser && (
-                <div className="mt-8 bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+                <div className="mt-8 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
                     <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
                         <div>
-                            <h2 className="text-xl font-bold text-gray-900">User Details</h2>
-                            <p className="text-xs text-gray-500">Account ID: {selectedUser.id}</p>
+                            <h2 className="text-xl font-semibold tracking-tight text-slate-900">User Details</h2>
+                            <p className="text-xs text-slate-500">Account ID: {selectedUser.id}</p>
                         </div>
                         <div className="flex flex-wrap gap-2">
                             <button
                                 onClick={() => performAction(selectedUser.status === 'DEACTIVATED' ? 'reactivate' : 'deactivate', selectedUser.id)}
-                                className="px-4 py-2 text-xs text-black font-semibold rounded-xl border border-gray-200 hover:bg-gray-50"
+                                className="px-4 py-2 text-xs font-medium rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50"
                             >
                                 {selectedUser.status === 'DEACTIVATED' ? 'Reactivate' : 'Deactivate'}
                             </button>
                             <button
                                 onClick={() => performAction('revoke_sessions', selectedUser.id)}
-                                className="px-4 py-2 text-xs text-black font-semibold rounded-xl border border-gray-200 hover:bg-gray-50"
+                                className="px-4 py-2 text-xs font-medium rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50"
                             >
                                 Force Logout
                             </button>
@@ -265,7 +265,7 @@ export default function UsersPage() {
                             </button> */}
                             <button
                                 onClick={() => performAction('soft_delete', selectedUser.id)}
-                                className="px-4 py-2 text-xs font-semibold rounded-xl border border-gray-200 text-red-600 hover:bg-red-50"
+                                className="px-4 py-2 text-xs font-medium rounded-lg border border-slate-200 text-red-600 hover:bg-red-50"
                             >
                                 Soft Delete
                             </button>
@@ -275,7 +275,7 @@ export default function UsersPage() {
                                         performAction('hard_delete', selectedUser.id);
                                     }
                                 }}
-                                className="px-4 py-2 text-xs font-semibold rounded-xl border border-red-200 text-red-700 hover:bg-red-50"
+                                className="px-4 py-2 text-xs font-medium rounded-lg border border-red-200 text-red-700 hover:bg-red-50"
                             >
                                 Hard Delete
                             </button>
@@ -288,77 +288,77 @@ export default function UsersPage() {
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            <div className="bg-gray-50 rounded-2xl p-4">
-                                <p className="text-xs text-gray-500">Role</p>
+                            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Role</p>
                                 <select
                                     value={selectedUser.role}
                                     onChange={(e) => performAction('set_role', selectedUser.id, { role: e.target.value })}
-                                    className="mt-2 w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-black"
+                                    className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 focus:border-slate-900 outline-none"
                                 >
                                     <option value="USER">USER</option>
                                     <option value="ADMIN">ADMIN</option>
                                     <option value="HOST">HOST</option>
                                 </select>
-                                <p className="text-xs text-gray-500 mt-4">Status</p>
-                                <p className="text-sm  font-semibold text-gray-900">{selectedUser.status}</p>
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 mt-4">Status</p>
+                                <p className="text-sm font-medium text-slate-900">{selectedUser.status}</p>
                                 {selectedUser.deactivatedAt && (
-                                    <p className="text-xs text-gray-500 mt-2">Deactivated: {new Date(selectedUser.deactivatedAt).toLocaleDateString()}</p>
+                                    <p className="text-xs text-slate-500 mt-2">Deactivated: {new Date(selectedUser.deactivatedAt).toLocaleDateString()}</p>
                                 )}
                                 {selectedUser.deletedAt && (
-                                    <p className="text-xs text-gray-500 mt-1">Deleted: {new Date(selectedUser.deletedAt).toLocaleDateString()}</p>
+                                    <p className="text-xs text-slate-500 mt-1">Deleted: {new Date(selectedUser.deletedAt).toLocaleDateString()}</p>
                                 )}
                             </div>
-                            <div className="bg-gray-50 rounded-2xl p-4">
-                                <p className="text-xs text-gray-500 mb-2">Reservations</p>
+                            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 mb-2">Reservations</p>
                                 <div className="space-y-2 max-h-48 overflow-y-auto">
                                     {selectedUser.reservations?.length ? selectedUser.reservations.map((r: any) => (
-                                        <div key={r.id} className="text-xs text-gray-700 flex items-center gap-2">
+                                        <div key={r.id} className="text-xs text-slate-700 flex items-center gap-2">
                                             <img src={r.listing?.imageSrc} alt="" className="w-8 h-8 rounded object-cover" />
                                             <div>
-                                                <p className="font-semibold">{r.listing?.title}</p>
-                                                <p className="text-gray-500">{new Date(r.createdAt).toLocaleDateString()}</p>
+                                                <p className="font-medium text-slate-900">{r.listing?.title}</p>
+                                                <p className="text-slate-500">{new Date(r.createdAt).toLocaleDateString()}</p>
                                             </div>
                                         </div>
-                                    )) : <p className="text-xs text-gray-400">No reservations</p>}
+                                    )) : <p className="text-xs text-slate-400">No reservations</p>}
                                 </div>
                             </div>
-                            <div className="bg-gray-50 rounded-2xl p-4">
-                                <p className="text-xs text-gray-500 mb-2">Listings</p>
+                            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 mb-2">Listings</p>
                                 <div className="space-y-2 max-h-48 overflow-y-auto">
                                     {selectedUser.listings?.length ? selectedUser.listings.map((l: any) => (
-                                        <div key={l.id} className="text-xs text-gray-700 flex items-center gap-2">
+                                        <div key={l.id} className="text-xs text-slate-700 flex items-center gap-2">
                                             <img src={l.imageSrc} alt="" className="w-8 h-8 rounded object-cover" />
                                             <div>
-                                                <p className="font-semibold">{l.title}</p>
-                                                <p className="text-gray-500">{new Date(l.createdAt).toLocaleDateString()}</p>
+                                                <p className="font-medium text-slate-900">{l.title}</p>
+                                                <p className="text-slate-500">{new Date(l.createdAt).toLocaleDateString()}</p>
                                             </div>
                                         </div>
-                                    )) : <p className="text-xs text-gray-400">No listings</p>}
+                                    )) : <p className="text-xs text-slate-400">No listings</p>}
                                 </div>
                             </div>
-                            <div className="bg-gray-50 rounded-2xl p-4">
-                                <p className="text-xs text-gray-500 mb-2">Reviews</p>
+                            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 mb-2">Reviews</p>
                                 <div className="space-y-2 max-h-48 overflow-y-auto">
                                     {selectedUser.reviews?.length ? selectedUser.reviews.map((r: any) => (
-                                        <div key={r.id} className="text-xs text-gray-700">
-                                            <p className="font-semibold">{r.listing?.title}</p>
-                                            <p className="text-gray-500">{r.comment?.slice(0, 60)}...</p>
+                                        <div key={r.id} className="text-xs text-slate-700">
+                                            <p className="font-medium text-slate-900">{r.listing?.title}</p>
+                                            <p className="text-slate-500">{r.comment?.slice(0, 60)}...</p>
                                         </div>
-                                    )) : <p className="text-xs text-gray-400">No reviews</p>}
+                                    )) : <p className="text-xs text-slate-400">No reviews</p>}
                                 </div>
                             </div>
-                            <div className="bg-gray-50 rounded-2xl p-4 lg:col-span-3">
-                                <p className="text-xs text-gray-500 mb-2">Audit Logs</p>
+                            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 lg:col-span-3">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 mb-2">Audit Logs</p>
                                 <div className="space-y-2 max-h-48 overflow-y-auto">
                                     {selectedUser.auditLogs?.length ? selectedUser.auditLogs.map((log: any) => (
-                                        <div key={log.id} className="text-xs text-gray-700 flex items-center justify-between">
+                                        <div key={log.id} className="text-xs text-slate-700 flex items-center justify-between">
                                             <div>
-                                                <p className="font-semibold">{log.action}</p>
-                                                <p className="text-gray-500">By: {log.admin?.email || 'Admin'}</p>
+                                                <p className="font-medium text-slate-900">{log.action}</p>
+                                                <p className="text-slate-500">By: {log.admin?.email || 'Admin'}</p>
                                             </div>
-                                            <span className="text-gray-400">{new Date(log.createdAt).toLocaleString()}</span>
+                                            <span className="text-slate-400">{new Date(log.createdAt).toLocaleString()}</span>
                                         </div>
-                                    )) : <p className="text-xs text-gray-400">No admin actions yet.</p>}
+                                    )) : <p className="text-xs text-slate-400">No admin actions yet.</p>}
                                 </div>
                             </div>
                         </div>

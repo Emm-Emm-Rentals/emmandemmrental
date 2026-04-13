@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   format,
   isSameMonth,
@@ -22,16 +22,139 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useUi } from '@/context/UiContext';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import { calculateStayPricingBreakdown, TaxProfileInput } from '@/lib/pricing';
 
 type BookingBarProps = {
   listingId?: string;
   basePricePerNight?: number | null;
+  cleaningFee?: number | null;
+  serviceFee?: number | null;
+  taxPercentage?: number | null;
+  locationValue?: string | null;
+  taxProfile?: TaxProfileInput | null;
   minStayNights?: number | null;
+  dynamicPricingRules?: unknown;
   maxGuests?: number | null;
+  lodgifyPropertyId?: string | null;
+  lodgifyBookingUrl?: string | null;
+  lodgifyWidgetEmbed?: string | null;
   onDateChange?: (payload: { startDate: Date | null; endDate: Date | null }) => void;
 };
 
-const BookingBar = ({ listingId, basePricePerNight = null, minStayNights = 1, maxGuests = 8, onDateChange }: BookingBarProps) => {
+const formatBookingMoney = (value: number, currency?: string | null) => {
+  if (currency) {
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency,
+        maximumFractionDigits: 2,
+      }).format(value);
+    } catch {
+      return `${currency} ${value.toFixed(2)}`;
+    }
+  }
+
+  return `$${value.toFixed(2)}`;
+};
+
+const HARDCODED_LODGIFY_PROPERTY_ID = '783877';
+const extractUnavailableDates = (payload: any) => {
+  const items = Array.isArray(payload)
+    ? payload
+    : payload?.data || payload?.items || payload?.results || payload?.availability || [];
+
+  const unavailableDates = new Set<string>();
+  const availableDates = new Set<string>();
+
+  const addDateRange = (
+    target: Set<string>,
+    startValue: string | null | undefined,
+    endValue: string | null | undefined
+  ) => {
+    if (!startValue || !endValue) return;
+    if (startValue === '0001-01-01' || endValue === '0001-01-01') return;
+
+    const current = new Date(startValue);
+    const end = new Date(endValue);
+    if (Number.isNaN(current.getTime()) || Number.isNaN(end.getTime())) return;
+
+    while (current <= end) {
+      target.add(format(current, 'yyyy-MM-dd'));
+      current.setDate(current.getDate() + 1);
+    }
+  };
+
+  const walk = (value: any) => {
+    if (!value) return;
+    if (Array.isArray(value)) {
+      value.forEach(walk);
+      return;
+    }
+    if (typeof value !== 'object') {
+      return;
+    }
+
+    if (Array.isArray(value.periods)) {
+      value.periods.forEach((period: any) => {
+        const start = period?.start || null;
+        const end = period?.end || null;
+        const isAvailable = Number(period?.available ?? 0) > 0;
+        const isClosed = Boolean(period?.closed_period);
+
+        if (isAvailable && !isClosed) {
+          addDateRange(availableDates, start, end);
+        } else {
+          addDateRange(unavailableDates, start, end);
+        }
+      });
+    }
+
+    const date =
+      value.date ||
+      value.day ||
+      value.startDate ||
+      value.start_date ||
+      value.arrival ||
+      null;
+    const explicit = value.is_available ?? value.isAvailable ?? value.available;
+    const units = value.available_units ?? value.availableUnits ?? value.units_available;
+    const status = String(value.status || '').toLowerCase();
+    const isBlocked =
+      explicit === false ||
+      (typeof units === 'number' && units <= 0) ||
+      status.includes('unavailable') ||
+      status.includes('blocked');
+
+    if (date && isBlocked) {
+      unavailableDates.add(String(date).slice(0, 10));
+    }
+
+    Object.values(value).forEach(walk);
+  };
+
+  walk(items);
+  if (availableDates.size > 0) {
+    return unavailableDates;
+  }
+  return unavailableDates;
+};
+
+const BookingBar = ({
+  listingId,
+  basePricePerNight = null,
+  cleaningFee = null,
+  serviceFee = null,
+  taxPercentage = null,
+  locationValue = null,
+  taxProfile = null,
+  minStayNights = 1,
+  dynamicPricingRules = [],
+  maxGuests = 8,
+  lodgifyPropertyId = null,
+  lodgifyBookingUrl = null,
+  lodgifyWidgetEmbed = null,
+  onDateChange,
+}: BookingBarProps) => {
   const { isLoginModalOpen, setIsLoginModalOpen, showToast } = useUi();
   const router = useRouter();
   const { data: session } = useSession();
@@ -42,10 +165,29 @@ const BookingBar = ({ listingId, basePricePerNight = null, minStayNights = 1, ma
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [guests, setGuests] = useState({ adults: 1, children: 0, infants: 0, pets: 0 });
   const [dateError, setDateError] = useState<string | null>(null);
+  const [isLodgifyChecking, setIsLodgifyChecking] = useState(false);
+  const [lodgifyCurrency, setLodgifyCurrency] = useState<string>('USD');
+  const [unavailableDates, setUnavailableDates] = useState<Set<string>>(new Set());
+  const [isCalendarAvailabilityLoading, setIsCalendarAvailabilityLoading] = useState(false);
 
   const safeMinStay = Math.max(1, Number(minStayNights || 1));
   const safeMaxGuests = Math.max(1, Number(maxGuests || 8));
-  const nightlyPrice = typeof basePricePerNight === 'number' ? basePricePerNight : null;
+  const fallbackNightlyPrice = typeof basePricePerNight === 'number' ? basePricePerNight : null;
+  const effectiveLodgifyPropertyId =
+    lodgifyPropertyId ||
+    (lodgifyBookingUrl || lodgifyWidgetEmbed ? HARDCODED_LODGIFY_PROPERTY_ID : null);
+  const isLodgifyMode = Boolean(effectiveLodgifyPropertyId);
+
+  useEffect(() => {
+    console.log('[booking-bar] mode', {
+      listingId,
+      lodgifyPropertyId,
+      lodgifyBookingUrl,
+      hasWidgetEmbed: Boolean(lodgifyWidgetEmbed),
+      effectiveLodgifyPropertyId,
+      isLodgifyMode,
+    });
+  }, [effectiveLodgifyPropertyId, isLodgifyMode, listingId, lodgifyBookingUrl, lodgifyPropertyId, lodgifyWidgetEmbed]);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -130,18 +272,159 @@ const BookingBar = ({ listingId, basePricePerNight = null, minStayNights = 1, ma
 
   const totalGuests = guests.adults + guests.children;
   const totalNights = startDate && endDate ? differenceInCalendarDays(endDate, startDate) : 0;
-  const totalPrice = nightlyPrice && totalNights > 0 ? nightlyPrice * totalNights : null;
+  const pricingPreview = useMemo(() => {
+    if (!startDate || !endDate || totalNights < safeMinStay) {
+      return null;
+    }
+
+    return calculateStayPricingBreakdown({
+      startDate,
+      endDate,
+      basePricePerNight: fallbackNightlyPrice ?? 0,
+      cleaningFee: Number(cleaningFee || 0),
+      serviceFee: Number(serviceFee || 0),
+      taxPercentage: Number(taxPercentage || 0),
+      locationValue,
+      taxProfile,
+      dynamicPricingRules,
+    });
+  }, [
+    cleaningFee,
+    dynamicPricingRules,
+    endDate,
+    fallbackNightlyPrice,
+    locationValue,
+    safeMinStay,
+    serviceFee,
+    startDate,
+    taxPercentage,
+    taxProfile,
+    totalNights,
+  ]);
+  const nightlyPrice = pricingPreview?.pricePerNight ?? fallbackNightlyPrice;
+  const totalPrice = pricingPreview?.nightlySubtotal ?? (nightlyPrice && totalNights > 0 ? nightlyPrice * totalNights : null);
   const isReserveDisabled = !startDate || !endDate || totalNights < safeMinStay;
   const canReserve = !isReserveDisabled && totalGuests <= safeMaxGuests && !!listingId;
   const canAddGuest = totalGuests < safeMaxGuests;
 
-  const handleReserve = () => {
+  useEffect(() => {
+    setLodgifyCurrency('USD');
+  }, [pricingPreview]);
+
+  useEffect(() => {
+    if (!isLodgifyMode || !effectiveLodgifyPropertyId) {
+      setUnavailableDates(new Set());
+      return;
+    }
+
+    let isCancelled = false;
+    const visibleStart = startOfWeek(startOfMonth(viewDate));
+    const visibleEnd = endOfWeek(endOfMonth(viewDate));
+
+    const fetchMonthAvailability = async () => {
+      console.log('[booking-bar] month preload availability', {
+        propertyId: effectiveLodgifyPropertyId,
+        viewMonth: format(viewDate, 'yyyy-MM'),
+        visibleStart: format(visibleStart, 'yyyy-MM-dd'),
+        visibleEnd: format(visibleEnd, 'yyyy-MM-dd'),
+      });
+      setIsCalendarAvailabilityLoading(true);
+      try {
+        const params = new URLSearchParams({
+          propertyId: effectiveLodgifyPropertyId,
+          startDate: format(visibleStart, 'yyyy-MM-dd'),
+          endDate: format(visibleEnd, 'yyyy-MM-dd'),
+        });
+        const response = await fetch(`/api/lodgify/availability?${params.toString()}`);
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.error || 'Failed to load Lodgify availability');
+        }
+
+        if (!isCancelled) {
+          const blockedDates = extractUnavailableDates(payload);
+          console.log('[booking-bar] unavailable dates loaded', {
+            propertyId: effectiveLodgifyPropertyId,
+            viewMonth: format(viewDate, 'yyyy-MM'),
+            count: blockedDates.size,
+            sample: Array.from(blockedDates).slice(0, 10),
+          });
+          setUnavailableDates(blockedDates);
+        }
+      } catch (error) {
+        if (!isCancelled) {
+          console.error('[booking-bar] failed to preload Lodgify availability', error);
+          setUnavailableDates(new Set());
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsCalendarAvailabilityLoading(false);
+        }
+      }
+    };
+
+    fetchMonthAvailability();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [effectiveLodgifyPropertyId, isLodgifyMode, viewDate]);
+
+  const handleReserve = async () => {
     if (!session) {
       showToast('Please log in to continue booking.', 'info');
       setIsLoginModalOpen(true);
       return;
     }
     if (!canReserve || !startDate || !endDate || !listingId) return;
+
+    if (isLodgifyMode && effectiveLodgifyPropertyId) {
+      try {
+        setIsLodgifyChecking(true);
+        const params = new URLSearchParams({
+          propertyId: effectiveLodgifyPropertyId,
+          startDate: format(startDate, 'yyyy-MM-dd'),
+          endDate: format(endDate, 'yyyy-MM-dd'),
+        });
+        const availabilityResponse = await fetch(`/api/lodgify/availability?${params.toString()}`);
+        const availabilityPayload = await availabilityResponse.json();
+
+        if (!availabilityResponse.ok) {
+          throw new Error(availabilityPayload.error || 'Failed to check Lodgify availability');
+        }
+
+        const items = Array.isArray(availabilityPayload)
+          ? availabilityPayload
+          : availabilityPayload?.data ||
+            availabilityPayload?.items ||
+            availabilityPayload?.results ||
+            availabilityPayload?.availability ||
+            [];
+
+        const hasUnavailableFlag = Array.isArray(items) && items.some((item: any) => {
+          const explicit = item?.is_available ?? item?.isAvailable ?? item?.available;
+          if (typeof explicit === 'boolean') return explicit === false;
+
+          const units = item?.available_units ?? item?.availableUnits ?? item?.units_available;
+          if (typeof units === 'number') return units <= 0;
+
+          const status = String(item?.status || '').toLowerCase();
+          return status.includes('unavailable') || status.includes('blocked');
+        });
+
+        if (hasUnavailableFlag) {
+          showToast('Selected dates are not available in Lodgify.', 'error');
+          return;
+        }
+        showToast('Availability confirmed.', 'success');
+      } catch (error: any) {
+        showToast(error.message || 'Failed to check Lodgify availability.', 'error');
+        return;
+      } finally {
+        setIsLodgifyChecking(false);
+      }
+    }
+
     const params = new URLSearchParams({
       startDate: format(startDate, 'yyyy-MM-dd'),
       endDate: format(endDate, 'yyyy-MM-dd'),
@@ -213,6 +496,12 @@ const BookingBar = ({ listingId, basePricePerNight = null, minStayNights = 1, ma
                 </div>
               )}
 
+              {isLodgifyMode && isCalendarAvailabilityLoading && (
+                <div className="px-2 mb-4 text-xs font-semibold text-gray-500">
+                  Loading Lodgify availability...
+                </div>
+              )}
+
               {dateError && (
                 <div className="px-2 mb-4 text-xs font-semibold text-rose-600">
                   {dateError}
@@ -231,6 +520,8 @@ const BookingBar = ({ listingId, basePricePerNight = null, minStayNights = 1, ma
                   const isEnd = endDate && isSameDay(day, endDate);
                   const isRange = startDate && endDate && isWithinInterval(day, { start: startDate, end: endDate });
                   const isPast = isBefore(day, startOfDay(new Date()));
+                  const isUnavailable =
+                    isLodgifyMode && unavailableDates.has(format(day, 'yyyy-MM-dd'));
 
                   return (
                     <div key={i} className="relative py-1 flex justify-center items-center">
@@ -239,11 +530,12 @@ const BookingBar = ({ listingId, basePricePerNight = null, minStayNights = 1, ma
                       )}
                       <button
                         onClick={() => handleDateClick(day)}
-                        disabled={!isCurrentMonth || isPast}
+                        disabled={!isCurrentMonth || isPast || isUnavailable}
                         className={`
                           relative z-10 w-9 h-9 md:w-11 md:h-11 flex items-center justify-center font-bold rounded-full transition-all
-                          ${!isCurrentMonth ? 'text-transparent cursor-default' : isPast ? 'text-gray-300 cursor-not-allowed' : 'text-gray-900 hover:bg-gray-100'}
+                          ${!isCurrentMonth ? 'text-transparent cursor-default' : isPast ? 'text-gray-300 cursor-not-allowed' : isUnavailable ? 'bg-rose-50 text-rose-300 cursor-not-allowed border border-rose-100' : 'text-gray-900 hover:bg-gray-100'}
                           ${(isStart || isEnd) ? 'bg-zinc-900 text-white hover:bg-zinc-900' : ''}
+                          ${isUnavailable && !(isStart || isEnd) ? 'line-through opacity-80' : ''}
                         `}
                       >
                         {format(day, 'd')}
@@ -303,7 +595,7 @@ const BookingBar = ({ listingId, basePricePerNight = null, minStayNights = 1, ma
           <div className="text-gray-900 font-bold text-base md:text-lg flex-1 md:block hidden">
             {nightlyPrice ? (
               <div className="flex flex-col">
-                <span>${nightlyPrice} / night</span>
+                <span>{formatBookingMoney(nightlyPrice, isLodgifyMode ? lodgifyCurrency : null)} / night</span>
                 <span className="text-xs font-semibold text-gray-500">Minimum stay: {safeMinStay} night{safeMinStay > 1 ? 's' : ''}</span>
               </div>
             ) : (
@@ -315,7 +607,9 @@ const BookingBar = ({ listingId, basePricePerNight = null, minStayNights = 1, ma
           <div className="flex md:hidden w-full items-center justify-between px-6 pt-2 pb-0.5">
             <div className="flex flex-col">
               <span className="text-xs font-bold text-gray-900">
-                {nightlyPrice ? `$${nightlyPrice} / night` : 'Add dates for prices'}
+                {nightlyPrice
+                  ? `${formatBookingMoney(nightlyPrice, isLodgifyMode ? lodgifyCurrency : null)} / night`
+                  : 'Add dates for prices'}
               </span>
               <div className="flex items-center gap-1">
                 <Star size={10} className="text-green-600 fill-green-600" />
@@ -351,10 +645,14 @@ const BookingBar = ({ listingId, basePricePerNight = null, minStayNights = 1, ma
           <div className="w-[94%] md:w-auto md:ml-5 pb-2 md:pb-0">
             <button
               onClick={handleReserve}
-              disabled={!canReserve}
+              disabled={!canReserve || isLodgifyChecking}
               className={`bg-[#EE4B90] hover:bg-[#D63D76] text-white w-full md:w-auto px-10 md:px-14 py-3.5 md:h-[64px] rounded-2xl md:rounded-[30px] font-bold text-sm md:text-lg active:scale-[0.98] shadow-lg shadow-pink-100 flex items-center justify-center transition-all ${!canReserve ? 'opacity-50 cursor-not-allowed hover:bg-[#EE4B90]' : ''}`}
             >
-              {totalPrice ? `Reserve · $${totalPrice}` : 'Reserve'}
+              {isLodgifyChecking
+                ? 'Checking...'
+                : totalPrice
+                ? `Reserve · ${formatBookingMoney(totalPrice, isLodgifyMode ? lodgifyCurrency : null)}`
+                : 'Reserve'}
             </button>
           </div>
         </div>

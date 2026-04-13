@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { calculatePricingBreakdown } from "@/lib/pricing";
+import { calculateStayPricingBreakdown } from "@/lib/pricing";
+import { getUnifiedReservationsForUser } from "@/lib/lodgify";
 
 const parseDate = (value: string) => {
     const date = new Date(value);
@@ -20,37 +21,12 @@ export async function GET() {
         }
 
         const userId = (session.user as any).id as string;
-        const reservations = await prisma.reservation.findMany({
-            where: { userId },
-            include: {
-                listing: {
-                    select: {
-                        id: true,
-                        title: true,
-                        subtitle: true,
-                        imageSrc: true,
-                        locationValue: true,
-                    },
-                },
-            },
-            orderBy: { startDate: "desc" },
-        });
+        const reservations = await getUnifiedReservationsForUser(
+            userId,
+            (session.user as any).email || null
+        );
 
-        const reviewedListingIds = await prisma.review.findMany({
-            where: { userId },
-            select: { listingId: true },
-        });
-
-        const reviewedSet = new Set(reviewedListingIds.map((r) => r.listingId));
-        const now = new Date();
-
-        const enriched = reservations.map((reservation) => ({
-            ...reservation,
-            isPast: reservation.endDate < now,
-            hasReview: reviewedSet.has(reservation.listingId),
-        }));
-
-        return NextResponse.json(enriched);
+        return NextResponse.json(reservations);
     } catch (error) {
         console.error("Get reservations error:", error);
         return NextResponse.json({ error: "Failed to fetch reservations" }, { status: 500 });
@@ -74,6 +50,12 @@ export async function POST(request: NextRequest) {
             children = 0,
             infants = 0,
             pets = 0,
+            agreementPolicyId = null,
+            agreementPolicyVersion = null,
+            agreementPolicyTitle = null,
+            paymentPolicyId = null,
+            paymentPolicyVersion = null,
+            paymentPolicyTitle = null,
         } = body;
 
         if (!listingId || !startDate || !endDate) {
@@ -100,6 +82,7 @@ export async function POST(request: NextRequest) {
                 serviceFee: true,
                 taxPercentage: true,
                 minStayNights: true,
+                dynamicPricingRules: true,
                 locationValue: true,
                 taxProfile: {
                     include: {
@@ -122,17 +105,18 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: `Minimum stay is ${minStay} nights` }, { status: 400 });
         }
 
-        const pricePerNight = listing.basePricePerNight ?? listing.price ?? 0;
         const cleaningFee = listing.cleaningFee ?? 0;
         const serviceFee = listing.serviceFee ?? 0;
-        const pricing = calculatePricingBreakdown({
-            nights,
-            pricePerNight,
+        const pricing = calculateStayPricingBreakdown({
+            startDate: parsedStart,
+            endDate: parsedEnd,
+            basePricePerNight: listing.basePricePerNight ?? listing.price ?? 0,
             cleaningFee,
             serviceFee,
             taxPercentage: listing.taxPercentage ?? 0,
             locationValue: listing.locationValue,
             taxProfile: listing.taxProfile || undefined,
+            dynamicPricingRules: listing.dynamicPricingRules,
         });
 
         const reservation = await prisma.reservation.create({
@@ -146,7 +130,7 @@ export async function POST(request: NextRequest) {
                 children,
                 infants,
                 pets,
-                pricePerNight,
+                pricePerNight: pricing.pricePerNight,
                 subtotal: pricing.subtotal,
                 cleaningFee,
                 serviceFee,
@@ -154,6 +138,12 @@ export async function POST(request: NextRequest) {
                 taxAmount: pricing.taxAmount,
                 taxBreakdown: pricing.taxLines as any,
                 totalPrice: pricing.total,
+                agreementPolicyId: typeof agreementPolicyId === 'string' ? agreementPolicyId : null,
+                agreementPolicyVersion: agreementPolicyVersion ? Number(agreementPolicyVersion) : null,
+                agreementPolicyTitle: typeof agreementPolicyTitle === 'string' ? agreementPolicyTitle : null,
+                paymentPolicyId: typeof paymentPolicyId === 'string' ? paymentPolicyId : null,
+                paymentPolicyVersion: paymentPolicyVersion ? Number(paymentPolicyVersion) : null,
+                paymentPolicyTitle: typeof paymentPolicyTitle === 'string' ? paymentPolicyTitle : null,
             },
             include: {
                 listing: {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { adminAuthOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { fetchLodgifyReservationsByIds, CANCELED_STATUSES } from "@/lib/lodgify";
 
 export async function GET(request: NextRequest) {
     try {
@@ -31,8 +32,39 @@ export async function GET(request: NextRequest) {
             take: pageSize,
         });
 
+        // Resolve real Lodgify status for reservations that are synced
+        const lodgifyIds = reservations
+            .map((r) => (r as any).lodgifyReservationId as string | null)
+            .filter((id): id is string => Boolean(id));
+
+        const lodgifyStatusMap = new Map<string, string>();
+        if (lodgifyIds.length > 0) {
+            try {
+                const lodgifyReservations = await fetchLodgifyReservationsByIds(lodgifyIds);
+                for (const lr of lodgifyReservations) {
+                    if (lr.id && lr.status) {
+                        lodgifyStatusMap.set(lr.id, lr.status);
+                    }
+                }
+            } catch {
+                // Lodgify unavailable — fall back to local paymentStatus
+            }
+        }
+
+        // Attach resolved lodgify status to each reservation
+        const enriched = reservations.map((r) => {
+            const lodgifyResId = (r as any).lodgifyReservationId as string | null;
+            const lodgifyStatus = lodgifyResId
+                ? lodgifyStatusMap.get(lodgifyResId) ?? null
+                : null;
+            const isCanceled = lodgifyStatus
+                ? CANCELED_STATUSES.has(lodgifyStatus.toLowerCase())
+                : false;
+            return { ...r, lodgifyStatus, isCanceled };
+        });
+
         return NextResponse.json({
-            data: reservations,
+            data: enriched,
             page,
             pageSize,
             total,

@@ -6,6 +6,23 @@ export type TaxLine = {
   amount: number;
 };
 
+export type DynamicPricingRule = {
+  id: string;
+  label: string;
+  startDate: string;
+  endDate: string;
+  nightlyPrice: number;
+  priority: number;
+  active: boolean;
+};
+
+export type NightlyRate = {
+  date: string;
+  price: number;
+  ruleId: string | null;
+  label: string | null;
+};
+
 export type TaxProfileInputLine = {
   id?: string;
   label: string;
@@ -38,6 +55,7 @@ export type PricingInput = {
 };
 
 export type PricingBreakdown = {
+  nightlySubtotal: number;
   subtotal: number;
   taxableBase: number;
   totalTaxRate: number;
@@ -48,7 +66,124 @@ export type PricingBreakdown = {
   gstAmount: number;
 };
 
+export type StayPricingInput = {
+  startDate: string | Date;
+  endDate: string | Date;
+  basePricePerNight: number;
+  cleaningFee: number;
+  serviceFee: number;
+  locationValue?: string | null;
+  taxPercentage?: number | null;
+  taxProfile?: TaxProfileInput | null;
+  dynamicPricingRules?: unknown;
+};
+
+export type StayPricingBreakdown = PricingBreakdown & {
+  nights: number;
+  pricePerNight: number;
+  nightlyRates: NightlyRate[];
+};
+
 const roundToCurrency = (value: number) => Math.round(value);
+
+const padDatePart = (value: number) => String(value).padStart(2, "0");
+
+const formatLocalDate = (date: Date) => {
+  return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}`;
+};
+
+const toDateOnly = (value: string | Date) => {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      return trimmed;
+    }
+    const parsed = new Date(trimmed);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return formatLocalDate(parsed);
+  }
+
+  if (Number.isNaN(value.getTime())) return null;
+  return formatLocalDate(value);
+};
+
+const enumerateStayDates = (startDate: string | Date, endDate: string | Date) => {
+  const start = toDateOnly(startDate);
+  const end = toDateOnly(endDate);
+  if (!start || !end || start >= end) return [] as string[];
+
+  const dates: string[] = [];
+  const current = new Date(`${start}T12:00:00`);
+  const last = new Date(`${end}T12:00:00`);
+
+  while (current < last) {
+    dates.push(formatLocalDate(current));
+    current.setDate(current.getDate() + 1);
+  }
+
+  return dates;
+};
+
+export const normalizeDynamicPricingRules = (input: unknown): DynamicPricingRule[] => {
+  if (!Array.isArray(input)) return [];
+
+  return input
+    .map((item, index) => {
+      if (!item || typeof item !== "object") return null;
+
+      const record = item as Record<string, unknown>;
+      const startDate = toDateOnly(String(record.startDate || ""));
+      const endDate = toDateOnly(String(record.endDate || ""));
+      const nightlyPrice = Number(record.nightlyPrice);
+
+      if (!startDate || !endDate || endDate < startDate || !Number.isFinite(nightlyPrice) || nightlyPrice < 0) {
+        return null;
+      }
+
+      return {
+        id: typeof record.id === "string" && record.id.trim() ? record.id.trim() : `rule_${index + 1}`,
+        label: typeof record.label === "string" && record.label.trim() ? record.label.trim() : `Rule ${index + 1}`,
+        startDate,
+        endDate,
+        nightlyPrice: roundToCurrency(nightlyPrice),
+        priority: Number.isFinite(Number(record.priority)) ? Number(record.priority) : 0,
+        active: record.active === false ? false : true,
+      };
+    })
+    .filter((rule): rule is DynamicPricingRule => Boolean(rule))
+    .sort((a, b) => {
+      if (a.priority !== b.priority) return b.priority - a.priority;
+      if (a.startDate !== b.startDate) return b.startDate.localeCompare(a.startDate);
+      return a.id.localeCompare(b.id);
+    });
+};
+
+export const calculateNightlyRates = ({
+  startDate,
+  endDate,
+  basePricePerNight,
+  dynamicPricingRules,
+}: {
+  startDate: string | Date;
+  endDate: string | Date;
+  basePricePerNight: number;
+  dynamicPricingRules?: unknown;
+}): NightlyRate[] => {
+  const stayDates = enumerateStayDates(startDate, endDate);
+  const rules = normalizeDynamicPricingRules(dynamicPricingRules).filter((rule) => rule.active);
+  const fallbackRate = roundToCurrency(Math.max(0, Number(basePricePerNight || 0)));
+
+  return stayDates.map((date) => {
+    const matchedRule = rules.find((rule) => date >= rule.startDate && date <= rule.endDate) || null;
+
+    return {
+      date,
+      price: matchedRule ? matchedRule.nightlyPrice : fallbackRate,
+      ruleId: matchedRule?.id || null,
+      label: matchedRule?.label || null,
+    };
+  });
+};
 
 const isUsLocation = (locationValue?: string | null) => {
   if (!locationValue) return false;
@@ -70,16 +205,21 @@ const isSeviervilleTn = (locationValue?: string | null) => {
   return normalized.includes("sevierville") && (normalized.includes("tennessee") || normalized.includes(", tn") || normalized.includes(" tn "));
 };
 
-export const calculatePricingBreakdown = ({
-  nights,
-  pricePerNight,
+const calculateBreakdownFromSubtotals = ({
+  nightlySubtotal,
   cleaningFee,
   serviceFee,
   locationValue,
   taxPercentage,
   taxProfile,
-}: PricingInput): PricingBreakdown => {
-  const nightlySubtotal = roundToCurrency(pricePerNight * nights);
+}: {
+  nightlySubtotal: number;
+  cleaningFee: number;
+  serviceFee: number;
+  locationValue?: string | null;
+  taxPercentage?: number | null;
+  taxProfile?: TaxProfileInput | null;
+}): PricingBreakdown => {
   const cleaningSubtotal = roundToCurrency(cleaningFee);
   const serviceSubtotal = roundToCurrency(serviceFee);
   const subtotal = nightlySubtotal + cleaningSubtotal + serviceSubtotal;
@@ -156,6 +296,7 @@ export const calculatePricingBreakdown = ({
   const total = subtotal + taxAmount;
 
   return {
+    nightlySubtotal,
     subtotal,
     taxableBase,
     totalTaxRate,
@@ -164,5 +305,61 @@ export const calculatePricingBreakdown = ({
     total,
     vatAmount,
     gstAmount,
+  };
+};
+
+export const calculatePricingBreakdown = ({
+  nights,
+  pricePerNight,
+  cleaningFee,
+  serviceFee,
+  locationValue,
+  taxPercentage,
+  taxProfile,
+}: PricingInput): PricingBreakdown => {
+  const nightlySubtotal = roundToCurrency(pricePerNight * nights);
+  return calculateBreakdownFromSubtotals({
+    nightlySubtotal,
+    cleaningFee,
+    serviceFee,
+    taxPercentage,
+    locationValue,
+    taxProfile,
+  });
+};
+
+export const calculateStayPricingBreakdown = ({
+  startDate,
+  endDate,
+  basePricePerNight,
+  cleaningFee,
+  serviceFee,
+  taxPercentage,
+  locationValue,
+  taxProfile,
+  dynamicPricingRules,
+}: StayPricingInput): StayPricingBreakdown => {
+  const nightlyRates = calculateNightlyRates({
+    startDate,
+    endDate,
+    basePricePerNight,
+    dynamicPricingRules,
+  });
+  const nights = nightlyRates.length;
+  const nightlySubtotal = nightlyRates.reduce((sum, night) => sum + night.price, 0);
+  const breakdown = calculateBreakdownFromSubtotals({
+    nightlySubtotal,
+    cleaningFee,
+    serviceFee,
+    taxPercentage,
+    locationValue,
+    taxProfile,
+  });
+
+  return {
+    ...breakdown,
+    nights,
+    pricePerNight: nights > 0 ? roundToCurrency(nightlySubtotal / nights) : roundToCurrency(basePricePerNight),
+    nightlyRates,
   };
 };

@@ -5,7 +5,7 @@ import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { ShieldCheck, X } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useUi } from '@/context/UiContext';
-import { calculatePricingBreakdown } from '@/lib/pricing';
+import { calculateStayPricingBreakdown } from '@/lib/pricing';
 import Link from 'next/link';
 
 type ListingData = {
@@ -18,6 +18,7 @@ type ListingData = {
     cleaningFee?: number | null;
     serviceFee?: number | null;
     taxPercentage?: number | null;
+    dynamicPricingRules?: unknown[];
     locationValue?: string | null;
     cancellationPolicy?: string | null;
     taxProfile?: {
@@ -36,6 +37,14 @@ type ListingData = {
     } | null;
 };
 
+type PolicyDoc = {
+    id: string;
+    policyKey: 'RENTAL_AGREEMENT' | 'PAYMENT_POLICY';
+    title: string;
+    content: string;
+    version: number;
+};
+
 const formatMoney = (value: number) => {
     return `$${value.toFixed(2)}`;
 };
@@ -49,9 +58,24 @@ export default function BookingConfirmPage() {
     const [listing, setListing] = useState<ListingData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
-    const [termsAccepted, setTermsAccepted] = useState(false);
+    const [policiesAccepted, setPoliciesAccepted] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [payFullAmount, setPayFullAmount] = useState(false); // guest choice: deposit vs full
     const [showPolicyModal, setShowPolicyModal] = useState(false);
+    const [policyDocs, setPolicyDocs] = useState<PolicyDoc[]>([]);
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+    const [guestDetails, setGuestDetails] = useState({
+        primaryGuestName: '',
+        primaryGuestEmail: '',
+        primaryGuestPhone: '',
+        primaryGuestLocale: 'en',
+        primaryGuestStreetAddress1: '',
+        primaryGuestStreetAddress2: '',
+        primaryGuestCity: '',
+        primaryGuestState: '',
+        primaryGuestPostalCode: '',
+        primaryGuestCountryCode: '',
+    });
     const { data: session } = useSession();
     const { setIsLoginModalOpen, showToast } = useUi();
 
@@ -63,6 +87,30 @@ export default function BookingConfirmPage() {
     const pets = Number(searchParams.get('pets') || 0);
 
     useEffect(() => {
+        if (session?.user) {
+            setGuestDetails((prev) => ({
+                ...prev,
+                primaryGuestName: prev.primaryGuestName || session.user?.name || '',
+                primaryGuestEmail: prev.primaryGuestEmail || session.user?.email || '',
+            }));
+        }
+    }, [session]);
+
+    useEffect(() => {
+        const loadPolicies = async () => {
+            try {
+                const response = await fetch('/api/policies?keys=RENTAL_AGREEMENT,PAYMENT_POLICY');
+                const data = await response.json();
+                if (response.ok) {
+                    setPolicyDocs(data.policies || []);
+                }
+            } catch (err) {
+                console.error('Failed to load policy documents', err);
+            }
+        };
+
+        loadPolicies();
+
         const fetchListing = async () => {
             try {
                 const response = await fetch(`/api/listings/${id}`);
@@ -86,22 +134,37 @@ export default function BookingConfirmPage() {
         return Math.ceil(diff / (1000 * 60 * 60 * 24));
     }, [startDate, endDate]);
 
+    // Deposit vs full-payment logic (per policy: >60 days out = 50% deposit)
+    const DEPOSIT_THRESHOLD_DAYS = 60;
+    const daysUntilArrival = useMemo(() => {
+        if (!startDate) return 0;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const arrival = new Date(startDate);
+        arrival.setHours(0, 0, 0, 0);
+        return Math.floor((arrival.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    }, [startDate]);
+    const isDepositBooking = daysUntilArrival > DEPOSIT_THRESHOLD_DAYS;
+    // True only when the guest is eligible for deposit AND has not opted to pay in full
+    const showDepositFlow = isDepositBooking && !payFullAmount;
+
     const pricing = useMemo(() => {
         if (!listing) return null;
-        const pricePerNight = listing.basePricePerNight ?? listing.price ?? 0;
         const cleaningFee = listing.cleaningFee ?? 0;
         const serviceFee = listing.serviceFee ?? 0;
-        const calculated = calculatePricingBreakdown({
-            nights,
-            pricePerNight,
+        const calculated = calculateStayPricingBreakdown({
+            startDate,
+            endDate,
+            basePricePerNight: listing.basePricePerNight ?? listing.price ?? 0,
             cleaningFee,
             serviceFee,
             taxPercentage: listing.taxPercentage ?? 0,
             locationValue: listing.locationValue,
             taxProfile: listing.taxProfile || undefined,
+            dynamicPricingRules: listing.dynamicPricingRules,
         });
-        return { pricePerNight, cleaningFee, serviceFee, ...calculated };
-    }, [listing, nights]);
+        return { cleaningFee, serviceFee, ...calculated };
+    }, [endDate, listing, nights, startDate]);
 
     const cancellationText = useMemo(() => {
         if (!listing?.cancellationPolicy?.trim()) {
@@ -115,6 +178,58 @@ export default function BookingConfirmPage() {
         return `${cancellationText.slice(0, 180)}...`;
     }, [cancellationText]);
     const hasExtendedCancellationPolicy = cancellationText.length > 180;
+    const rentalAgreementPolicy = policyDocs.find((policy) => policy.policyKey === 'RENTAL_AGREEMENT') || null;
+    const paymentPolicy = policyDocs.find((policy) => policy.policyKey === 'PAYMENT_POLICY') || null;
+
+    const validateGuestDetails = () => {
+        const nextErrors: Record<string, string> = {};
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const phoneRegex = /^[+()\-\d\s]{7,}$/;
+        const countryCodeRegex = /^[A-Za-z]{2,3}$/;
+
+        if (!guestDetails.primaryGuestName.trim()) {
+            nextErrors.primaryGuestName = 'Guest name is required.';
+        }
+        if (!guestDetails.primaryGuestEmail.trim()) {
+            nextErrors.primaryGuestEmail = 'Guest email is required.';
+        } else if (!emailRegex.test(guestDetails.primaryGuestEmail.trim())) {
+            nextErrors.primaryGuestEmail = 'Enter a valid email address.';
+        }
+        if (!guestDetails.primaryGuestPhone.trim()) {
+            nextErrors.primaryGuestPhone = 'Phone number is required.';
+        } else if (!phoneRegex.test(guestDetails.primaryGuestPhone.trim())) {
+            nextErrors.primaryGuestPhone = 'Enter a valid phone number.';
+        }
+        if (!guestDetails.primaryGuestLocale.trim()) {
+            nextErrors.primaryGuestLocale = 'Locale is required.';
+        }
+        if (!guestDetails.primaryGuestStreetAddress1.trim()) {
+            nextErrors.primaryGuestStreetAddress1 = 'Address line 1 is required.';
+        }
+        if (!guestDetails.primaryGuestStreetAddress2.trim()) {
+            nextErrors.primaryGuestStreetAddress2 = 'Address line 2 is required.';
+        }
+        if (!guestDetails.primaryGuestCity.trim()) {
+            nextErrors.primaryGuestCity = 'City is required.';
+        }
+        if (!guestDetails.primaryGuestState.trim()) {
+            nextErrors.primaryGuestState = 'State is required.';
+        }
+        if (!guestDetails.primaryGuestPostalCode.trim()) {
+            nextErrors.primaryGuestPostalCode = 'Postal code is required.';
+        }
+        if (!guestDetails.primaryGuestCountryCode.trim()) {
+            nextErrors.primaryGuestCountryCode = 'Country code is required.';
+        } else if (!countryCodeRegex.test(guestDetails.primaryGuestCountryCode.trim())) {
+            nextErrors.primaryGuestCountryCode = 'Use a 2-letter country code like IN or US.';
+        }
+        if (!policiesAccepted) {
+            nextErrors.policiesAccepted = 'Please accept the terms and policies to continue.';
+        }
+
+        setFieldErrors(nextErrors);
+        return nextErrors;
+    };
 
     const handlePay = async () => {
         if (!session) {
@@ -122,7 +237,12 @@ export default function BookingConfirmPage() {
             setIsLoginModalOpen(true);
             return;
         }
-        if (!listing || !startDate || !endDate || !termsAccepted || nights <= 0) return;
+        const validationErrors = validateGuestDetails();
+        if (Object.keys(validationErrors).length > 0) {
+            setError('Please complete all traveler details before continuing.');
+            return;
+        }
+        if (!listing || !startDate || !endDate || nights <= 0) return;
         setIsSubmitting(true);
         setError('');
         try {
@@ -137,6 +257,14 @@ export default function BookingConfirmPage() {
                     children,
                     infants,
                     pets,
+                    ...guestDetails,
+                    agreementPolicyId: rentalAgreementPolicy?.id || null,
+                    agreementPolicyVersion: rentalAgreementPolicy?.version || null,
+                    agreementPolicyTitle: rentalAgreementPolicy?.title || null,
+                    paymentPolicyId: paymentPolicy?.id || null,
+                    paymentPolicyVersion: paymentPolicy?.version || null,
+                    paymentPolicyTitle: paymentPolicy?.title || null,
+                    payFullAmount: isDepositBooking ? payFullAmount : true,
                 }),
             });
 
@@ -183,34 +311,213 @@ export default function BookingConfirmPage() {
                         <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-6">Confirm and pay</h1>
                         <div className="space-y-6">
                             <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+                                <h3 className="text-lg font-bold text-gray-900 mb-2">Traveler details</h3>
+                                <p className="text-sm text-gray-500 mb-5">Use the details for the guest who will stay. These can be different from your account.</p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <label className="space-y-2">
+                                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Guest name</span>
+                                        <input
+                                            value={guestDetails.primaryGuestName}
+                                            onChange={(e) => setGuestDetails((prev) => ({ ...prev, primaryGuestName: e.target.value }))}
+                                            className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-black placeholder:text-gray-400 outline-none focus:border-gray-900"
+                                            placeholder="John Doe"
+                                            required
+                                        />
+                                        {fieldErrors.primaryGuestName && <p className="text-xs text-red-600">{fieldErrors.primaryGuestName}</p>}
+                                    </label>
+                                    <label className="space-y-2">
+                                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Guest email</span>
+                                        <input
+                                            type="email"
+                                            value={guestDetails.primaryGuestEmail}
+                                            onChange={(e) => setGuestDetails((prev) => ({ ...prev, primaryGuestEmail: e.target.value }))}
+                                            className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-black placeholder:text-gray-400 outline-none focus:border-gray-900"
+                                            placeholder="guest@example.com"
+                                            required
+                                        />
+                                        {fieldErrors.primaryGuestEmail && <p className="text-xs text-red-600">{fieldErrors.primaryGuestEmail}</p>}
+                                    </label>
+                                    <label className="space-y-2">
+                                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Phone</span>
+                                        <input
+                                            value={guestDetails.primaryGuestPhone}
+                                            onChange={(e) => setGuestDetails((prev) => ({ ...prev, primaryGuestPhone: e.target.value }))}
+                                            className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-black placeholder:text-gray-400 outline-none focus:border-gray-900"
+                                            placeholder="+91 98765 43210"
+                                            required
+                                        />
+                                        {fieldErrors.primaryGuestPhone && <p className="text-xs text-red-600">{fieldErrors.primaryGuestPhone}</p>}
+                                    </label>
+                                    <label className="space-y-2">
+                                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Locale</span>
+                                        <input
+                                            value={guestDetails.primaryGuestLocale}
+                                            onChange={(e) => setGuestDetails((prev) => ({ ...prev, primaryGuestLocale: e.target.value }))}
+                                            className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-black placeholder:text-gray-400 outline-none focus:border-gray-900"
+                                            placeholder="en"
+                                            required
+                                        />
+                                        {fieldErrors.primaryGuestLocale && <p className="text-xs text-red-600">{fieldErrors.primaryGuestLocale}</p>}
+                                    </label>
+                                    <label className="space-y-2 md:col-span-2">
+                                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Address line 1</span>
+                                        <input
+                                            value={guestDetails.primaryGuestStreetAddress1}
+                                            onChange={(e) => setGuestDetails((prev) => ({ ...prev, primaryGuestStreetAddress1: e.target.value }))}
+                                            className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-black placeholder:text-gray-400 outline-none focus:border-gray-900"
+                                            placeholder="Street address"
+                                            required
+                                        />
+                                        {fieldErrors.primaryGuestStreetAddress1 && <p className="text-xs text-red-600">{fieldErrors.primaryGuestStreetAddress1}</p>}
+                                    </label>
+                                    <label className="space-y-2 md:col-span-2">
+                                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Address line 2</span>
+                                        <input
+                                            value={guestDetails.primaryGuestStreetAddress2}
+                                            onChange={(e) => setGuestDetails((prev) => ({ ...prev, primaryGuestStreetAddress2: e.target.value }))}
+                                            className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-black placeholder:text-gray-400 outline-none focus:border-gray-900"
+                                            placeholder="Apartment, suite, etc."
+                                            required
+                                        />
+                                        {fieldErrors.primaryGuestStreetAddress2 && <p className="text-xs text-red-600">{fieldErrors.primaryGuestStreetAddress2}</p>}
+                                    </label>
+                                    <label className="space-y-2">
+                                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">City</span>
+                                        <input
+                                            value={guestDetails.primaryGuestCity}
+                                            onChange={(e) => setGuestDetails((prev) => ({ ...prev, primaryGuestCity: e.target.value }))}
+                                            className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-black placeholder:text-gray-400 outline-none focus:border-gray-900"
+                                            placeholder="City"
+                                            required
+                                        />
+                                        {fieldErrors.primaryGuestCity && <p className="text-xs text-red-600">{fieldErrors.primaryGuestCity}</p>}
+                                    </label>
+                                    <label className="space-y-2">
+                                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">State</span>
+                                        <input
+                                            value={guestDetails.primaryGuestState}
+                                            onChange={(e) => setGuestDetails((prev) => ({ ...prev, primaryGuestState: e.target.value }))}
+                                            className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-black placeholder:text-gray-400 outline-none focus:border-gray-900"
+                                            placeholder="State"
+                                            required
+                                        />
+                                        {fieldErrors.primaryGuestState && <p className="text-xs text-red-600">{fieldErrors.primaryGuestState}</p>}
+                                    </label>
+                                    <label className="space-y-2">
+                                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Postal code</span>
+                                        <input
+                                            value={guestDetails.primaryGuestPostalCode}
+                                            onChange={(e) => setGuestDetails((prev) => ({ ...prev, primaryGuestPostalCode: e.target.value }))}
+                                            className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-black placeholder:text-gray-400 outline-none focus:border-gray-900"
+                                            placeholder="Postal code"
+                                            required
+                                        />
+                                        {fieldErrors.primaryGuestPostalCode && <p className="text-xs text-red-600">{fieldErrors.primaryGuestPostalCode}</p>}
+                                    </label>
+                                    <label className="space-y-2">
+                                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Country code</span>
+                                        <input
+                                            value={guestDetails.primaryGuestCountryCode}
+                                            onChange={(e) => setGuestDetails((prev) => ({ ...prev, primaryGuestCountryCode: e.target.value }))}
+                                            className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-black placeholder:text-gray-400 outline-none focus:border-gray-900"
+                                            placeholder="IN"
+                                            required
+                                        />
+                                        {fieldErrors.primaryGuestCountryCode && <p className="text-xs text-red-600">{fieldErrors.primaryGuestCountryCode}</p>}
+                                    </label>
+                                </div>
+                            </div>
+
+                            {isDepositBooking && (
+                                <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+                                    <h3 className="text-lg font-bold text-gray-900 mb-1">Payment option</h3>
+                                    <p className="text-sm text-gray-500 mb-4">Your arrival is more than 60 days away — choose how you'd like to pay.</p>
+                                    <div className="space-y-3">
+                                        <label className={`flex items-start gap-4 rounded-xl border p-4 cursor-pointer transition-colors ${!payFullAmount ? 'border-gray-900 bg-gray-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                                            <input
+                                                type="radio"
+                                                name="paymentOption"
+                                                checked={!payFullAmount}
+                                                onChange={() => setPayFullAmount(false)}
+                                                className="mt-0.5"
+                                            />
+                                            <div>
+                                                <p className="text-sm font-semibold text-gray-900">
+                                                    Pay 50% deposit now — {formatMoney((pricing?.total || 0) / 2)}
+                                                </p>
+                                                <p className="text-xs text-gray-500 mt-0.5">
+                                                    Remaining {formatMoney((pricing?.total || 0) / 2)} auto-charged to your card 60 days before check-in (
+                                                    {new Date(new Date(startDate).getTime() - 60 * 24 * 60 * 60 * 1000)
+                                                        .toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}).
+                                                </p>
+                                            </div>
+                                        </label>
+                                        <label className={`flex items-start gap-4 rounded-xl border p-4 cursor-pointer transition-colors ${payFullAmount ? 'border-gray-900 bg-gray-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                                            <input
+                                                type="radio"
+                                                name="paymentOption"
+                                                checked={payFullAmount}
+                                                onChange={() => setPayFullAmount(true)}
+                                                className="mt-0.5"
+                                            />
+                                            <div>
+                                                <p className="text-sm font-semibold text-gray-900">
+                                                    Pay in full now — {formatMoney(pricing?.total || 0)}
+                                                </p>
+                                                <p className="text-xs text-gray-500 mt-0.5">
+                                                    No future charges. Everything settled today.
+                                                </p>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
                                 <h3 className="text-lg font-bold text-gray-900 mb-2">Proceed to payment</h3>
                                 <p className="text-sm text-gray-500">Secure payment powered by Stripe.</p>
-                                <label className="flex items-center gap-3 mt-6 text-sm text-gray-600">
-                                    <input
-                                        type="checkbox"
-                                        checked={termsAccepted}
-                                        onChange={(e) => setTermsAccepted(e.target.checked)}
-                                        className="w-4 h-4"
-                                    />
-                                    <span>
-                                        I agree to the{' '}
-                                        <Link href="/terms-of-service" className="underline text-gray-900 font-medium">
-                                            Terms of Service
-                                        </Link>{' '}
-                                        and{' '}
-                                        <Link href="/privacy-policy" className="underline text-gray-900 font-medium">
-                                            Privacy Policy
-                                        </Link>
-                                        .
-                                    </span>
-                                </label>
+                                <div className="mt-6 rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                                    <label className="flex items-start gap-3 text-sm text-gray-600 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={policiesAccepted}
+                                            onChange={(e) => setPoliciesAccepted(e.target.checked)}
+                                            className="mt-1 w-4 h-4"
+                                        />
+                                        <span>
+                                            I agree to the{' '}
+                                            <Link href="/terms-of-service" className="underline text-gray-900 font-medium">
+                                                Rental Agreement
+                                            </Link>
+                                            {' '}and the{' '}
+                                            <Link href="/payment-policy" className="underline text-gray-900 font-medium">
+                                                Payment Policy
+                                            </Link>
+                                            .
+                                        </span>
+                                    </label>
+                                    {fieldErrors.policiesAccepted && (
+                                        <p className="text-xs text-red-600 mt-2">{fieldErrors.policiesAccepted}</p>
+                                    )}
+                                </div>
+                                {showDepositFlow && (
+                                    <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800 leading-relaxed">
+                                        <span className="font-semibold">50% deposit required now.</span> Because your arrival is more than 60 days away, only half the total is due today. The remaining balance of{' '}
+                                        <span className="font-semibold">{formatMoney((pricing?.total || 0) / 2)}</span> will be automatically charged to your card 60 days before check-in. By paying, you authorise this future charge per our{' '}
+                                        <a href="/payment-policy" className="underline font-medium text-amber-900">Payment Policy</a>.
+                                    </div>
+                                )}
                                 {error && <p className="text-sm text-red-600 mt-3">{error}</p>}
                                 <button
                                     onClick={handlePay}
-                                    disabled={!termsAccepted || isSubmitting}
+                                    disabled={!policiesAccepted || isSubmitting}
                                     className="mt-6 w-full sm:w-auto bg-gray-900 text-white px-6 py-3 rounded-xl text-sm font-semibold hover:bg-gray-800 disabled:opacity-50"
                                 >
-                                    {isSubmitting ? 'Redirecting…' : `Pay ${formatMoney(pricing?.total || 0)}`}
+                                    {isSubmitting
+                                        ? 'Redirecting…'
+                                        : showDepositFlow
+                                            ? `Pay 50% Deposit — ${formatMoney((pricing?.total || 0) / 2)}`
+                                            : `Pay ${formatMoney(pricing?.total || 0)}`}
                                 </button>
                             </div>
                         </div>
@@ -247,8 +554,8 @@ export default function BookingConfirmPage() {
 
                             <div className="py-4 text-sm text-black space-y-2 border-b border-gray-100">
                                 <div className="flex items-center justify-between">
-                                    <span>{nights} nights × {formatMoney(pricing.pricePerNight)}</span>
-                                    <span>{formatMoney(pricing.pricePerNight * nights)}</span>
+                                    <span>Stay price</span>
+                                    <span>{formatMoney(pricing.nightlySubtotal)}</span>
                                 </div>
                                 {pricing.cleaningFee > 0 && (
                                     <div className="flex items-center justify-between">
@@ -299,6 +606,37 @@ export default function BookingConfirmPage() {
                             <div className="pt-4 flex text-black items-center justify-between font-semibold">
                                 <span>Total Price</span>
                                 <span>{formatMoney(pricing.total)}</span>
+                            </div>
+
+                            {showDepositFlow && (
+                                <div className="mt-3 pt-3 border-t border-gray-100 space-y-1 text-sm">
+                                    <div className="flex items-center justify-between text-amber-700 font-semibold">
+                                        <span>Due today (50% deposit)</span>
+                                        <span>{formatMoney(pricing.total / 2)}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-gray-500">
+                                        <span>
+                                            Balance due{' '}
+                                            {new Date(new Date(startDate).getTime() - 60 * 24 * 60 * 60 * 1000)
+                                                .toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                        </span>
+                                        <span>{formatMoney(pricing.total - pricing.total / 2)}</span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="mt-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 mb-3">Policies</p>
+                            <div className="space-y-2 text-sm">
+                                <Link href="/terms-of-service" className="flex items-center justify-between rounded-xl border border-gray-200 px-3 py-2 hover:bg-gray-50">
+                                    <span className="font-medium text-gray-900">Rental Agreement</span>
+                                    <span className="text-xs text-gray-500">v{rentalAgreementPolicy?.version || 1}</span>
+                                </Link>
+                                <Link href="/payment-policy" className="flex items-center justify-between rounded-xl border border-gray-200 px-3 py-2 hover:bg-gray-50">
+                                    <span className="font-medium text-gray-900">Payment Policy</span>
+                                    <span className="text-xs text-gray-500">v{paymentPolicy?.version || 1}</span>
+                                </Link>
                             </div>
                         </div>
 

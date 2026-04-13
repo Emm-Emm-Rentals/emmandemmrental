@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Home, User, MapPin, Tag, MoreVertical, Edit, Trash2, Plus, GripVertical, Loader2 } from 'lucide-react';
+import { Home, User, MapPin, Tag, MoreVertical, Edit, Trash2, Plus, GripVertical, Loader2, Eye } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function ListingsPage() {
@@ -117,36 +117,36 @@ export default function ListingsPage() {
     }
 
     return (
-        <div>
-            <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-8 gap-4">
+        <div className="space-y-6">
+            <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Listing Management</h1>
-                    <p className="text-gray-500">Monitor and manage property listings. Drag and drop to control display order.</p>
+                    <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Listing Management</h1>
+                    <p className="text-sm text-slate-500">Monitor and manage property listings. Drag and drop to control display order.</p>
                 </div>
                 <div className="flex items-center gap-3">
                     {isSavingOrder && (
-                        <div className="flex items-center gap-2 text-xs font-semibold text-blue-600">
+                        <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
                             <Loader2 size={14} className="animate-spin" />
                             Saving order...
                         </div>
                     )}
-                    <div className="flex items-center bg-white border border-gray-200 rounded-lg overflow-hidden">
+                    <div className="flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
                         <button
                             onClick={() => setViewMode('grid')}
-                            className={`px-3 py-2 text-xs font-semibold ${viewMode === 'grid' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+                            className={`px-3 py-2 text-xs font-medium ${viewMode === 'grid' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
                         >
                             Grid
                         </button>
                         <button
                             onClick={() => setViewMode('list')}
-                            className={`px-3 py-2 text-xs font-semibold ${viewMode === 'list' ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+                            className={`px-3 py-2 text-xs font-medium ${viewMode === 'list' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
                         >
                             List
                         </button>
                     </div>
                     <button
                         onClick={() => router.push('/admin/listings/new')}
-                        className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                        className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-lg hover:bg-slate-800 transition-colors font-medium shadow-sm"
                     >
                         <Plus size={20} />
                         New Listing
@@ -168,7 +168,7 @@ export default function ListingsPage() {
                                 setDraggingId(null);
                             }}
                             onDragEnd={() => setDraggingId(null)}
-                            className={`bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden group hover:shadow-md transition-shadow relative ${
+                            className={`bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden group hover:shadow-md transition-shadow relative ${
                                 draggingId === listing.id ? 'opacity-60' : ''
                             }`}
                         >
@@ -178,32 +178,42 @@ export default function ListingsPage() {
                                     alt={listing.title}
                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                 />
-                                <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm p-2 rounded-lg border border-white/20 text-gray-700 cursor-grab active:cursor-grabbing">
+                                <div className="absolute top-4 left-4 bg-white/95 backdrop-blur-sm p-2 rounded-lg border border-slate-200 text-slate-600 cursor-grab active:cursor-grabbing shadow-sm">
                                     <GripVertical size={16} />
                                 </div>
-                                <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-gray-900 shadow-sm border border-white/20">
+                                <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-medium text-slate-900 shadow-sm border border-slate-200">
                                     ${listing.basePricePerNight} / night
                                 </div>
                             </div>
                             <div className="p-6">
                                 <div className="flex justify-between items-start mb-2">
-                                    <h3 className="font-bold text-gray-900 line-clamp-1">{listing.title}</h3>
+                                    <h3 className="font-medium text-slate-900 line-clamp-1">{listing.title}</h3>
                                     <div className="relative">
                                         <button
                                             onClick={() => setOpenMenuId(openMenuId === listing.id ? null : listing.id)}
-                                            className="p-1 hover:bg-gray-50 rounded-lg"
+                                            className="p-1 hover:bg-slate-50 rounded-lg"
                                         >
-                                            <MoreVertical size={16} className="text-gray-400" />
+                                            <MoreVertical size={16} className="text-slate-400" />
                                         </button>
 
                                         {openMenuId === listing.id && (
-                                            <div className="absolute right-0 mt-1 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                                            <div className="absolute right-0 mt-1 w-40 bg-white border border-slate-200 rounded-lg shadow-lg z-10">
+                                                <button
+                                                    onClick={() => {
+                                                        router.push(`/admin/listings/${listing.id}/view`);
+                                                        setOpenMenuId(null);
+                                                    }}
+                                                    className="w-full flex items-center gap-2 px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 border-b border-slate-200"
+                                                >
+                                                    <Eye size={16} />
+                                                    View
+                                                </button>
                                                 <button
                                                     onClick={() => {
                                                         handleEdit(listing.id);
                                                         setOpenMenuId(null);
                                                     }}
-                                                    className="w-full flex items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100"
+                                                    className="w-full flex items-center gap-2 px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 border-b border-slate-200"
                                                 >
                                                     <Edit size={16} />
                                                     Edit
@@ -222,22 +232,22 @@ export default function ListingsPage() {
                                 </div>
 
                                 <div className="space-y-3 mb-6">
-                                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                                    <div className="flex items-center gap-2 text-sm text-slate-500">
                                         <MapPin size={14} />
                                         <span>{listing.locationValue}</span>
                                     </div>
-                                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                                    <div className="flex items-center gap-2 text-sm text-slate-500">
                                         <Tag size={14} />
                                         <span>{listing.category}</span>
                                     </div>
-                                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                                    <div className="flex items-center gap-2 text-sm text-slate-500">
                                         <User size={14} />
                                         <span>Hosted by {listing.user?.name || listing.user?.email || 'Unknown'}</span>
                                     </div>
                                 </div>
 
-                                <div className="flex items-center justify-between pt-4 border-t border-gray-50">
-                                    <div className="flex gap-3 text-xs font-medium text-gray-400">
+                                <div className="flex items-center justify-between pt-4 border-t border-slate-200">
+                                    <div className="flex gap-3 text-xs font-medium text-slate-400">
                                         <span>{listing.roomCount} Rooms</span>
                                         <span>{listing.guestCount} Guests</span>
                                     </div>
@@ -249,15 +259,15 @@ export default function ListingsPage() {
             )}
 
             {viewMode === 'list' && (
-                <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
-                    <div className="grid grid-cols-12 gap-4 px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-100">
+                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                    <div className="grid grid-cols-12 gap-4 px-6 py-4 text-[11px] font-medium text-slate-500 uppercase tracking-[0.18em] border-b border-slate-200">
                         <div className="col-span-4">Property</div>
                         <div className="col-span-2">Location</div>
                         <div className="col-span-2">Pricing</div>
                         <div className="col-span-3">Details</div>
                         <div className="col-span-1 text-right">Actions</div>
                     </div>
-                    <div className="divide-y divide-gray-100">
+                    <div className="divide-y divide-slate-200">
                         {listings.map((listing) => (
                             <div
                                 key={listing.id}
@@ -270,34 +280,34 @@ export default function ListingsPage() {
                                     setDraggingId(null);
                                 }}
                                 onDragEnd={() => setDraggingId(null)}
-                                className={`grid grid-cols-12 gap-4 px-6 py-5 items-start ${draggingId === listing.id ? 'opacity-60 bg-blue-50/50' : ''}`}
+                                className={`grid grid-cols-12 gap-4 px-6 py-5 items-start ${draggingId === listing.id ? 'opacity-60 bg-slate-50' : ''}`}
                             >
                                 <div className="col-span-4 flex gap-4">
-                                    <div className="pt-1 text-gray-400 cursor-grab active:cursor-grabbing">
+                                    <div className="pt-1 text-slate-400 cursor-grab active:cursor-grabbing">
                                         <GripVertical size={16} />
                                     </div>
-                                    <img src={listing.imageSrc} alt={listing.title} className="w-24 h-20 rounded-xl object-cover border border-gray-100" />
+                                    <img src={listing.imageSrc} alt={listing.title} className="w-24 h-20 rounded-lg object-cover border border-slate-200" />
                                     <div>
-                                        <p className="font-semibold text-gray-900">{listing.title}</p>
-                                        {listing.subtitle && <p className="text-xs text-gray-500 mt-1">{listing.subtitle}</p>}
-                                        <p className="text-xs text-gray-500 mt-2 line-clamp-2">{listing.description}</p>
+                                        <p className="font-medium text-slate-900">{listing.title}</p>
+                                        {listing.subtitle && <p className="text-xs text-slate-500 mt-1">{listing.subtitle}</p>}
+                                        <p className="text-xs text-slate-500 mt-2 line-clamp-2">{listing.description}</p>
                                     </div>
                                 </div>
-                                <div className="col-span-2 text-sm text-gray-600">
+                                <div className="col-span-2 text-sm text-slate-600">
                                     <div className="flex items-center gap-2">
                                         <MapPin size={14} />
                                         <span>{listing.locationValue}</span>
                                     </div>
-                                    <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
+                                    <div className="flex items-center gap-2 mt-2 text-xs text-slate-500">
                                         <Tag size={12} />
                                         <span>{listing.category}</span>
                                     </div>
                                 </div>
-                                <div className="col-span-2 text-sm text-gray-600">
-                                    <div className="font-semibold text-gray-900">${listing.basePricePerNight} / night</div>
-                                    <div className="text-xs text-gray-500 mt-1">Min stay: {listing.minStayNights || 1} nights</div>
+                                <div className="col-span-2 text-sm text-slate-600">
+                                    <div className="font-medium text-slate-900">${listing.basePricePerNight} / night</div>
+                                    <div className="text-xs text-slate-500 mt-1">Min stay: {listing.minStayNights || 1} nights</div>
                                 </div>
-                                <div className="col-span-3 text-xs text-gray-600 space-y-1">
+                                <div className="col-span-3 text-xs text-slate-600 space-y-1">
                                     <div>{listing.guestCount} guests · {listing.roomCount} rooms · {listing.bathroomCount} baths</div>
                                     <div>Amenities: {listing.amenities?.length || 0}</div>
                                     <div>Rules: {listing.rules?.length || 0}</div>
@@ -307,18 +317,28 @@ export default function ListingsPage() {
                                     <div className="relative">
                                         <button
                                             onClick={() => setOpenMenuId(openMenuId === listing.id ? null : listing.id)}
-                                            className="p-1 hover:bg-gray-50 rounded-lg"
+                                            className="p-1 hover:bg-slate-50 rounded-lg"
                                         >
-                                            <MoreVertical size={16} className="text-gray-400" />
+                                            <MoreVertical size={16} className="text-slate-400" />
                                         </button>
                                         {openMenuId === listing.id && (
-                                            <div className="absolute right-0 mt-1 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                                            <div className="absolute right-0 mt-1 w-40 bg-white border border-slate-200 rounded-lg shadow-lg z-10">
+                                                <button
+                                                    onClick={() => {
+                                                        router.push(`/admin/listings/${listing.id}/view`);
+                                                        setOpenMenuId(null);
+                                                    }}
+                                                    className="w-full flex items-center gap-2 px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 border-b border-slate-200"
+                                                >
+                                                    <Eye size={16} />
+                                                    View
+                                                </button>
                                                 <button
                                                     onClick={() => {
                                                         handleEdit(listing.id);
                                                         setOpenMenuId(null);
                                                     }}
-                                                    className="w-full flex items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100"
+                                                    className="w-full flex items-center gap-2 px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 border-b border-slate-200"
                                                 >
                                                     <Edit size={16} />
                                                     Edit
@@ -342,12 +362,12 @@ export default function ListingsPage() {
             )}
 
             {listings.length === 0 && (
-                <div className="py-20 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-                    <Home size={32} className="mx-auto text-gray-300 mb-3" />
-                    <p className="text-gray-400 font-medium mb-4">No listings found yet.</p>
+                <div className="py-20 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                    <Home size={32} className="mx-auto text-slate-300 mb-3" />
+                    <p className="text-slate-500 font-medium mb-4">No listings found yet.</p>
                     <button
                         onClick={() => router.push('/admin/listings/new')}
-                        className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                        className="inline-flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-lg hover:bg-slate-800 transition-colors font-medium shadow-sm"
                     >
                         <Plus size={18} />
                         Create Your First Listing
@@ -357,7 +377,7 @@ export default function ListingsPage() {
 
             {total > 0 && (
                 <div className="mt-8 flex items-center justify-between">
-                    <p className="text-sm text-gray-500">{total} total listings</p>
+                    <p className="text-sm text-slate-500">{total} total listings</p>
                 </div>
             )}
         </div>

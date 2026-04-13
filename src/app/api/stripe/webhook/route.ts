@@ -28,7 +28,35 @@ export async function POST(request: NextRequest) {
 
     try {
         if (event.type === "checkout.session.completed") {
-            await upsertReservationFromCheckoutSession(event.data.object);
+            const checkoutSession = event.data.object;
+            const sessionType = checkoutSession.metadata?.type;
+
+            if (sessionType === "balance_payment") {
+                // Guest manually paid their remaining balance
+                const reservationId = checkoutSession.metadata?.reservationId;
+                if (reservationId && checkoutSession.payment_status === "paid") {
+                    const amountPaid = checkoutSession.amount_total || 0;
+                    const existing = await prisma.reservation.findUnique({
+                        where: { id: reservationId },
+                        select: { amountPaid: true },
+                    });
+                    await prisma.reservation.update({
+                        where: { id: reservationId },
+                        data: {
+                            balancePaid: true,
+                            balancePaidAt: new Date(),
+                            balanceStripePaymentIntentId:
+                                typeof checkoutSession.payment_intent === "string"
+                                    ? checkoutSession.payment_intent
+                                    : null,
+                            amountPaid: (existing?.amountPaid || 0) + amountPaid,
+                            paymentStatus: "paid",
+                        },
+                    });
+                }
+            } else {
+                await upsertReservationFromCheckoutSession(checkoutSession);
+            }
         }
 
         if (event.type === "charge.refunded") {

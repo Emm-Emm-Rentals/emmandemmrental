@@ -57,7 +57,28 @@ type ListingDetail = {
     listingId: string;
   }>;
   basePricePerNight?: number | null;
+  cleaningFee?: number | null;
+  serviceFee?: number | null;
+  taxPercentage?: number | null;
   minStayNights?: number | null;
+  dynamicPricingRules?: unknown[];
+  lodgifyPropertyId?: string | null;
+  lodgifyBookingUrl?: string | null;
+  lodgifyWidgetEmbed?: string | null;
+  taxProfile?: {
+    id: string;
+    name: string;
+    vatRate?: number | null;
+    gstRate?: number | null;
+    lines?: Array<{
+      id?: string;
+      label: string;
+      rate: number;
+      appliesTo: 'NIGHTLY' | 'CLEANING' | 'SERVICE' | 'ALL';
+      order?: number;
+      isActive?: boolean;
+    }>;
+  } | null;
   images: Array<{ id: string; imageUrl: string }>;
 };
 
@@ -209,8 +230,17 @@ export default function ListingDetailClient({
         <BookingBar
           listingId={listing.id}
           basePricePerNight={listing.basePricePerNight}
+          cleaningFee={listing.cleaningFee}
+          serviceFee={listing.serviceFee}
+          taxPercentage={listing.taxPercentage}
+          locationValue={listing.locationValue}
+          taxProfile={listing.taxProfile}
           minStayNights={listing.minStayNights}
+          dynamicPricingRules={listing.dynamicPricingRules}
           maxGuests={listing.guestCount}
+          lodgifyPropertyId={listing.lodgifyPropertyId}
+          lodgifyBookingUrl={listing.lodgifyBookingUrl}
+          lodgifyWidgetEmbed={listing.lodgifyWidgetEmbed}
           onDateChange={({ startDate }) => {
             setSelectedStartDate(startDate);
           }}

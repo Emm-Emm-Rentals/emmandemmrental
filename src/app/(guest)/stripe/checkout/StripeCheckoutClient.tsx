@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Lock, CreditCard, CheckCircle2 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useUi } from '@/context/UiContext';
-import { calculatePricingBreakdown } from '@/lib/pricing';
+import { calculateStayPricingBreakdown } from '@/lib/pricing';
 
 type ListingData = {
   id: string;
@@ -17,6 +17,7 @@ type ListingData = {
   cleaningFee?: number | null;
   serviceFee?: number | null;
   taxPercentage?: number | null;
+  dynamicPricingRules?: unknown[];
   locationValue?: string | null;
   taxProfile?: {
     id: string;
@@ -79,20 +80,21 @@ export default function StripeCheckoutClient() {
 
   const pricing = useMemo(() => {
     if (!listing) return null;
-    const pricePerNight = listing.basePricePerNight ?? listing.price ?? 0;
     const cleaningFee = listing.cleaningFee ?? 0;
     const serviceFee = listing.serviceFee ?? 0;
-    const calculated = calculatePricingBreakdown({
-      nights,
-      pricePerNight,
+    const calculated = calculateStayPricingBreakdown({
+      startDate,
+      endDate,
+      basePricePerNight: listing.basePricePerNight ?? listing.price ?? 0,
       cleaningFee,
       serviceFee,
       taxPercentage: listing.taxPercentage ?? 0,
       locationValue: listing.locationValue,
       taxProfile: listing.taxProfile || undefined,
+      dynamicPricingRules: listing.dynamicPricingRules,
     });
-    return { pricePerNight, cleaningFee, serviceFee, ...calculated };
-  }, [listing, nights]);
+    return { cleaningFee, serviceFee, ...calculated };
+  }, [endDate, listing, nights, startDate]);
 
   const handlePay = async () => {
     if (!session) {
@@ -219,8 +221,8 @@ export default function StripeCheckoutClient() {
               </div>
               <div className="py-4 text-sm space-y-2 border-b border-gray-100">
                 <div className="flex items-center justify-between">
-                  <span>{nights} nights × {formatMoney(pricing.pricePerNight)}</span>
-                  <span>{formatMoney(pricing.pricePerNight * nights)}</span>
+                  <span>Stay price</span>
+                  <span>{formatMoney(pricing.nightlySubtotal)}</span>
                 </div>
                 {pricing.cleaningFee > 0 && (
                   <div className="flex items-center justify-between">

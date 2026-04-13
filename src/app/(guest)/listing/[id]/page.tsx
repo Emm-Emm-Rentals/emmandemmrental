@@ -80,6 +80,13 @@ export default async function PropertyPage({
             createdAt: 'desc',
           },
         },
+        taxProfile: {
+          include: {
+            lines: {
+              orderBy: { order: 'asc' },
+            },
+          },
+        },
       },
     })
   );

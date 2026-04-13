@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Edit2, Map, Shield, Mail, ChevronRight } from 'lucide-react';
+import { Edit2, Map, Shield, Mail, ChevronRight, CircleOff } from 'lucide-react';
 import EditProfileModal from '@/components/EditProfileModal';
 import Link from 'next/link';
 
@@ -14,11 +14,13 @@ type ProfileUser = {
 
 type ProfileBooking = {
   id: string;
+  source?: 'lodgify' | 'local';
   startDate: string;
   endDate: string;
   adults: number;
   children: number;
   totalPrice: number;
+  currency?: string;
   listing: {
     title: string;
     imageSrc: string;
@@ -90,7 +92,7 @@ const ProfileClient = ({ user, bookings }: { user: ProfileUser; bookings: Profil
               <h2 className="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-[0.2em]">Activity</h2>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Link href="/trips/past" className="flex items-center justify-between p-5 bg-gray-50 rounded-2xl border border-gray-100 group hover:bg-white hover:shadow-sm transition-all">
                 <div className="flex items-center gap-4">
                   <div className="p-3 bg-white rounded-xl shadow-sm group-hover:bg-[#f44786] group-hover:text-white transition-colors">
@@ -116,6 +118,19 @@ const ProfileClient = ({ user, bookings }: { user: ProfileUser; bookings: Profil
                 </div>
                 <ChevronRight size={18} className="text-gray-400" />
               </Link>
+
+              <Link href="/trips/cancelled" className="flex items-center justify-between p-5 bg-gray-50 rounded-2xl border border-gray-100 group hover:bg-white hover:shadow-sm transition-all">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-white rounded-xl shadow-sm group-hover:bg-[#f44786] group-hover:text-white transition-colors">
+                    <CircleOff size={20} />
+                  </div>
+                  <div>
+                    <p className="font-bold text-gray-900 text-sm md:text-base">Cancelled Trips</p>
+                    <p className="text-xs text-gray-500 font-medium">View declined or cancelled bookings</p>
+                  </div>
+                </div>
+                <ChevronRight size={18} className="text-gray-400" />
+              </Link>
             </div>
           </section>
 
@@ -132,7 +147,7 @@ const ProfileClient = ({ user, bookings }: { user: ProfileUser; bookings: Profil
               <div className="space-y-4">
                 {bookings.map((booking) => (
                   <div key={booking.id} className="bg-white border border-gray-100 rounded-2xl p-5 flex flex-col md:flex-row md:items-center gap-4 shadow-sm">
-                    <img src={booking.listing?.imageSrc} alt={booking.listing?.title} className="w-full md:w-28 h-20 rounded-xl object-cover" />
+                    <img src={booking.listing?.imageSrc || '/banner.png'} alt={booking.listing?.title} className="w-full md:w-28 h-20 rounded-xl object-cover" />
                     <div className="flex-1">
                       <p className="font-semibold text-gray-900">{booking.listing?.title}</p>
                       <p className="text-xs text-gray-500 mt-1">
@@ -142,7 +157,16 @@ const ProfileClient = ({ user, bookings }: { user: ProfileUser; bookings: Profil
                         Guests: {booking.adults} Adults{booking.children ? `, ${booking.children} Children` : ''}
                       </p>
                     </div>
-                    <div className="text-sm font-semibold text-gray-900">${booking.totalPrice.toFixed(2)}</div>
+                    <div className="text-right">
+                      <div className="text-sm font-semibold text-gray-900">
+                        {booking.currency || 'USD'} {booking.totalPrice.toFixed(2)}
+                      </div>
+                      {booking.source === 'lodgify' && (
+                        <div className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mt-1">
+                          Lodgify
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

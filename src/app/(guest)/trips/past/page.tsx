@@ -1,8 +1,8 @@
 import { redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
 import PastTripsClient from '@/components/pages/PastTripsClient';
+import { getUnifiedReservationsForUser } from '@/lib/lodgify';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,39 +14,22 @@ export default async function PastTripsPage() {
     redirect('/');
   }
 
-  const reservations = await prisma.reservation.findMany({
-    where: { userId },
-    include: {
-      listing: {
-        select: {
-          id: true,
-          title: true,
-          imageSrc: true,
-        },
-      },
-    },
-    orderBy: { endDate: 'desc' },
-  });
-
-  const reviewedListingIds = await prisma.review.findMany({
-    where: { userId },
-    select: { listingId: true },
-  });
-
-  const reviewedSet = new Set(reviewedListingIds.map((r) => r.listingId));
+  const reservations = await getUnifiedReservationsForUser(userId, session?.user?.email);
   const now = new Date();
 
   const bookings = reservations
-    .filter((booking) => booking.endDate < now)
+    .filter((booking) => !booking.isCanceled && new Date(booking.endDate) < now)
     .map((booking) => ({
       id: booking.id,
       listingId: booking.listingId,
-      startDate: booking.startDate.toISOString(),
-      endDate: booking.endDate.toISOString(),
-      hasReview: reviewedSet.has(booking.listingId),
+      startDate: booking.startDate,
+      endDate: booking.endDate,
+      hasReview: booking.hasReview,
+      reviewable: booking.reviewable,
+      source: booking.source,
       listing: {
-        title: booking.listing?.title || 'Listing',
-        imageSrc: booking.listing?.imageSrc || '',
+        title: booking.listing.title || 'Listing',
+        imageSrc: booking.listing.imageSrc || '',
       },
     }));
 

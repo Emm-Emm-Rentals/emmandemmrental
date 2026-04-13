@@ -16,7 +16,7 @@ export default async function AdminLayout({
 
     return (
         <Providers basePath="/api/admin/auth">
-            <div className="flex min-h-screen bg-gray-50 overflow-hidden admin-text-black">
+            <div className="flex min-h-screen bg-slate-100 overflow-hidden text-slate-900">
                 <Sidebar />
                 <main className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-12">
                     <div className="max-w-6xl mx-auto">

@@ -183,21 +183,21 @@ export default function TaxProfilesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Tax Profiles</h1>
-        <p className="text-sm text-gray-500">Create reusable tax rules and assign them to listings.</p>
+      <div className="space-y-1">
+        <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Tax Profiles</h1>
+        <p className="text-sm text-slate-500">Create reusable tax rules and assign them to listings.</p>
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 text-red-700 px-4 py-3 text-sm">{error}</div>
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-[280px,1fr] gap-6">
-        <div className="bg-white border border-gray-200 rounded-2xl p-4 h-fit">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm h-fit">
           <button
             type="button"
             onClick={handleNew}
-            className="w-full mb-3 px-3 py-2 rounded-lg border border-gray-300 text-sm font-semibold flex items-center justify-center gap-2 hover:bg-gray-50"
+            className="w-full mb-3 h-11 px-3 rounded-lg border border-slate-200 text-sm font-medium flex items-center justify-center gap-2 hover:bg-slate-50 text-slate-700"
           >
             <Plus size={14} />
             New Profile
@@ -209,72 +209,72 @@ export default function TaxProfilesPage() {
                 key={profile.id}
                 type="button"
                 onClick={() => setSelectedId(profile.id)}
-                className={`w-full text-left px-3 py-2 rounded-lg border text-sm ${selectedId === profile.id ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 hover:bg-gray-50'}`}
+                className={`w-full text-left px-3 py-3 rounded-lg border text-sm transition-colors ${selectedId === profile.id ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 hover:bg-slate-50 text-slate-700'}`}
               >
                 <p className="font-semibold">{profile.name}</p>
-                <p className={`text-xs ${selectedId === profile.id ? 'text-gray-300' : 'text-gray-500'}`}>
+                <p className={`text-xs ${selectedId === profile.id ? 'text-slate-300' : 'text-slate-500'}`}>
                   {profile.country}{profile.state ? ` • ${profile.state}` : ''}{profile.city ? ` • ${profile.city}` : ''}
                 </p>
               </button>
             ))}
             {!isLoading && profiles.length === 0 && (
-              <p className="text-xs text-gray-500">No tax profiles yet.</p>
+              <p className="text-xs text-slate-500">No tax profiles yet.</p>
             )}
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-5">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <label className="text-sm">
-              <span className="block text-xs text-gray-500 mb-1">Profile name</span>
-              <input value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2" />
+              <span className="block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 mb-2">Profile name</span>
+              <input value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} className="w-full h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 focus:bg-white focus:border-slate-900 outline-none" />
             </label>
             <label className="text-sm">
-              <span className="block text-xs text-gray-500 mb-1">Country</span>
-              <input value={form.country} onChange={(e) => setForm((prev) => ({ ...prev, country: e.target.value.toUpperCase() }))} className="w-full rounded-lg border border-gray-300 px-3 py-2" />
+              <span className="block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 mb-2">Country</span>
+              <input value={form.country} onChange={(e) => setForm((prev) => ({ ...prev, country: e.target.value.toUpperCase() }))} className="w-full h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 focus:bg-white focus:border-slate-900 outline-none" />
             </label>
             <label className="text-sm">
-              <span className="block text-xs text-gray-500 mb-1">State/Region</span>
-              <input value={form.state} onChange={(e) => setForm((prev) => ({ ...prev, state: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2" />
+              <span className="block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 mb-2">State/Region</span>
+              <input value={form.state} onChange={(e) => setForm((prev) => ({ ...prev, state: e.target.value }))} className="w-full h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 focus:bg-white focus:border-slate-900 outline-none" />
             </label>
             <label className="text-sm">
-              <span className="block text-xs text-gray-500 mb-1">County</span>
-              <input value={form.county} onChange={(e) => setForm((prev) => ({ ...prev, county: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2" />
+              <span className="block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 mb-2">County</span>
+              <input value={form.county} onChange={(e) => setForm((prev) => ({ ...prev, county: e.target.value }))} className="w-full h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 focus:bg-white focus:border-slate-900 outline-none" />
             </label>
             <label className="text-sm">
-              <span className="block text-xs text-gray-500 mb-1">City</span>
-              <input value={form.city} onChange={(e) => setForm((prev) => ({ ...prev, city: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2" />
+              <span className="block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 mb-2">City</span>
+              <input value={form.city} onChange={(e) => setForm((prev) => ({ ...prev, city: e.target.value }))} className="w-full h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 focus:bg-white focus:border-slate-900 outline-none" />
             </label>
             <label className="text-sm flex items-end gap-2">
               <input type="checkbox" checked={form.isActive} onChange={(e) => setForm((prev) => ({ ...prev, isActive: e.target.checked }))} />
-              <span className="text-sm text-gray-700">Active profile</span>
+              <span className="text-sm text-slate-700">Active profile</span>
             </label>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <label className="text-sm">
-              <span className="block text-xs text-gray-500 mb-1">VAT rate (%)</span>
-              <input value={form.vatRate} onChange={(e) => setForm((prev) => ({ ...prev, vatRate: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2" />
+              <span className="block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 mb-2">VAT rate (%)</span>
+              <input value={form.vatRate} onChange={(e) => setForm((prev) => ({ ...prev, vatRate: e.target.value }))} className="w-full h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 focus:bg-white focus:border-slate-900 outline-none" />
             </label>
             <label className="text-sm">
-              <span className="block text-xs text-gray-500 mb-1">GST rate (%)</span>
-              <input value={form.gstRate} onChange={(e) => setForm((prev) => ({ ...prev, gstRate: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2" />
+              <span className="block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 mb-2">GST rate (%)</span>
+              <input value={form.gstRate} onChange={(e) => setForm((prev) => ({ ...prev, gstRate: e.target.value }))} className="w-full h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 focus:bg-white focus:border-slate-900 outline-none" />
             </label>
           </div>
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="font-semibold text-gray-900">Tax lines</h2>
+              <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-700">Tax lines</h2>
               <button
                 type="button"
                 onClick={() => setForm((prev) => ({ ...prev, lines: [...prev.lines, emptyLine(prev.lines.length)] }))}
-                className="text-sm font-semibold text-blue-600"
+                className="text-sm font-medium text-slate-700 hover:text-slate-900"
               >
                 + Add line
               </button>
             </div>
             {form.lines.map((line, index) => (
-              <div key={index} className="grid grid-cols-1 md:grid-cols-[1.4fr,.7fr,.9fr,auto] gap-2 items-center">
+              <div key={index} className="grid grid-cols-1 md:grid-cols-[1.4fr,.7fr,.9fr,auto] gap-2 items-center rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <input
                   value={line.label}
                   onChange={(e) => {
@@ -283,7 +283,7 @@ export default function TaxProfilesPage() {
                     setForm((prev) => ({ ...prev, lines }));
                   }}
                   placeholder="Tax label"
-                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 focus:border-slate-900 outline-none"
                 />
                 <input
                   value={line.rate}
@@ -293,7 +293,7 @@ export default function TaxProfilesPage() {
                     setForm((prev) => ({ ...prev, lines }));
                   }}
                   placeholder="Rate %"
-                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 focus:border-slate-900 outline-none"
                 />
                 <select
                   value={line.appliesTo}
@@ -302,7 +302,7 @@ export default function TaxProfilesPage() {
                     lines[index].appliesTo = e.target.value as TaxLine['appliesTo'];
                     setForm((prev) => ({ ...prev, lines }));
                   }}
-                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 focus:border-slate-900 outline-none"
                 >
                   <option value="ALL">All charges</option>
                   <option value="NIGHTLY">Nightly only</option>
@@ -315,7 +315,7 @@ export default function TaxProfilesPage() {
                     const lines = form.lines.filter((_, i) => i !== index);
                     setForm((prev) => ({ ...prev, lines: lines.length > 0 ? lines : [emptyLine(0)] }));
                   }}
-                  className="rounded-lg border border-red-200 text-red-600 p-2 hover:bg-red-50"
+                  className="h-11 rounded-lg border border-red-200 text-red-600 px-3 hover:bg-red-50"
                 >
                   <Trash2 size={14} />
                 </button>
@@ -328,7 +328,7 @@ export default function TaxProfilesPage() {
               type="button"
               onClick={handleSave}
               disabled={isSaving}
-              className="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-800 disabled:opacity-50 flex items-center gap-2"
+              className="h-11 px-4 rounded-lg bg-slate-950 text-white text-sm font-medium hover:bg-slate-900 disabled:opacity-50 flex items-center gap-2"
             >
               <Save size={14} />
               {isSaving ? 'Saving...' : 'Save profile'}
@@ -338,7 +338,7 @@ export default function TaxProfilesPage() {
                 type="button"
                 onClick={handleDelete}
                 disabled={isSaving}
-                className="px-4 py-2 rounded-lg border border-red-200 text-red-600 text-sm font-semibold hover:bg-red-50 disabled:opacity-50"
+                className="h-11 px-4 rounded-lg border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 disabled:opacity-50"
               >
                 Delete
               </button>
@@ -349,4 +349,3 @@ export default function TaxProfilesPage() {
     </div>
   );
 }
-

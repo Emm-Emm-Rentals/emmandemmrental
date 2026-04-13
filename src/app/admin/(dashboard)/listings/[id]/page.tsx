@@ -13,6 +13,7 @@ export default function ListingPage() {
     const [listing, setListing] = useState(null);
     const [isLoading, setIsLoading] = useState(!!id);
     const [isSaving, setIsSaving] = useState(false);
+    const [saveError, setSaveError] = useState('');
 
     useEffect(() => {
         if (id) {
@@ -35,6 +36,7 @@ export default function ListingPage() {
 
     const handleSubmit = async (data: any) => {
         setIsSaving(true);
+        setSaveError('');
         try {
             const payload = {
                 ...data,
@@ -47,12 +49,16 @@ export default function ListingPage() {
                 body: JSON.stringify(payload),
             });
 
-            if (!response.ok) throw new Error('Failed to save');
+            if (!response.ok) {
+                const errorPayload = await response.json().catch(() => null);
+                throw new Error(errorPayload?.error || 'Failed to save');
+            }
 
             const savedListing = await response.json();
             router.push(`/admin/listings`);
         } catch (error) {
             console.error('Failed to save listing:', error);
+            setSaveError(error instanceof Error ? error.message : 'Failed to save listing');
             throw error;
         } finally {
             setIsSaving(false);
@@ -69,33 +75,44 @@ export default function ListingPage() {
     }
 
     return (
-        <div>
-            <button
-                onClick={() => router.back()}
-                className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition-colors"
-            >
-                <ArrowLeft size={20} />
-                Back
-            </button>
+        <div className="max-w-6xl mx-auto">
+            <div className="mb-6 flex items-center justify-between gap-4">
+                <button
+                    onClick={() => router.back()}
+                    className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+                >
+                    <ArrowLeft size={18} />
+                    Back to listings
+                </button>
+                <div className="hidden sm:flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-500">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                    Admin editor
+                </div>
+            </div>
 
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-900">
-                    {id ? 'Edit Listing' : 'Create New Listing'}
+            <div className="mb-8 rounded-2xl border border-gray-200 bg-white px-6 py-5 shadow-sm">
+                <h1 className="text-2xl font-semibold text-gray-900">
+                    {id ? 'Edit listing' : 'Create listing'}
                 </h1>
-                <p className="text-gray-500 mt-2">
+                <p className="mt-1 text-sm text-gray-500">
                     {id
-                        ? 'Update the details and images for this property'
-                        : 'Add a new property listing with complete details and images'
+                        ? 'Update property details, pricing, and Lodgify settings.'
+                        : 'Add a new property with pricing, amenities, and booking settings.'
                     }
                 </p>
             </div>
+
+            {saveError && (
+                <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {saveError}
+                </div>
+            )}
 
             <ListingForm
                 initialData={listing}
                 onSubmit={handleSubmit}
                 isLoading={isSaving}
             />
-
         </div>
     );
 }

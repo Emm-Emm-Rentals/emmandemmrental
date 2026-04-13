@@ -5,6 +5,54 @@ import { useEffect, useState } from 'react';
 const formatDate = (value: string) =>
     new Date(value).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
 
+// amountPaid, balanceDueAmount, refundedAmount — stored in cents (from Stripe)
+const formatMoney = (cents: number, currency = 'usd') =>
+    new Intl.NumberFormat('en-US', { style: 'currency', currency: currency.toUpperCase() }).format(cents / 100);
+
+// pricePerNight, totalPrice, cleaningFee, serviceFee, taxAmount — stored in dollars
+const formatDollars = (dollars: number, currency = 'usd') =>
+    new Intl.NumberFormat('en-US', { style: 'currency', currency: currency.toUpperCase() }).format(dollars);
+
+type ReservationStatus = 'Active' | 'Upcoming' | 'Completed' | 'Cancelled' | 'Balance Failed' | 'Pending';
+
+function getStatus(reservation: any): ReservationStatus {
+    const now = new Date();
+    const start = new Date(reservation.startDate);
+    const end = new Date(reservation.endDate);
+    const ps = (reservation.paymentStatus || '').toLowerCase();
+    const lodgifyStatus = (reservation.lodgifyStatus || '').toLowerCase();
+
+    // Cancelled — check both Lodgify status (matches CANCELED_STATUSES) and local paymentStatus
+    if (reservation.isCanceled) return 'Cancelled';
+    if (ps === 'canceled' || ps === 'cancelled') return 'Cancelled';
+    if (['declined', 'rejected', 'deleted', 'trash', 'trashed'].includes(lodgifyStatus)) return 'Cancelled';
+
+    if (ps === 'balance_failed') return 'Balance Failed';
+    if (end < now) return 'Completed';
+    if (start <= now && end >= now) return 'Active';
+    if (ps === 'paid' || ps === 'succeeded') return 'Upcoming';
+    return 'Pending';
+}
+
+const STATUS_STYLES: Record<ReservationStatus, string> = {
+    Active: 'bg-green-50 text-green-700 border-green-200',
+    Upcoming: 'bg-blue-50 text-blue-700 border-blue-200',
+    Completed: 'bg-slate-100 text-slate-500 border-slate-200',
+    Cancelled: 'bg-red-50 text-red-600 border-red-200',
+    'Balance Failed': 'bg-orange-50 text-orange-700 border-orange-200',
+    Pending: 'bg-yellow-50 text-yellow-700 border-yellow-200',
+};
+
+function InfoRow({ label, value }: { label: string; value?: string | null }) {
+    if (!value) return null;
+    return (
+        <div className="flex gap-2 text-xs">
+            <span className="w-24 shrink-0 text-slate-400">{label}</span>
+            <span className="text-slate-700 break-all">{value}</span>
+        </div>
+    );
+}
+
 export default function AdminReservationsPage() {
     const [reservations, setReservations] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -14,6 +62,7 @@ export default function AdminReservationsPage() {
     const [total, setTotal] = useState(0);
     const [refundAmounts, setRefundAmounts] = useState<Record<string, string>>({});
     const [isRefunding, setIsRefunding] = useState<Record<string, boolean>>({});
+    const [expandedId, setExpandedId] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchReservations = async () => {
@@ -34,29 +83,16 @@ export default function AdminReservationsPage() {
         fetchReservations();
     }, [page]);
 
-    const formatMoney = (cents: number, currency = 'usd') => {
-        const amount = cents / 100;
-        return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: currency.toUpperCase(),
-        }).format(amount);
-    };
-
     const handleRefund = async (reservationId: string, amountCents?: number) => {
         try {
             setIsRefunding((prev) => ({ ...prev, [reservationId]: true }));
             const response = await fetch('/api/admin/refunds', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    reservationId,
-                    amount: amountCents,
-                }),
+                body: JSON.stringify({ reservationId, amount: amountCents }),
             });
             const data = await response.json();
-            if (!response.ok) {
-                throw new Error(data.error || 'Refund failed');
-            }
+            if (!response.ok) throw new Error(data.error || 'Refund failed');
             setReservations((prev) => prev.map((r) => (r.id === reservationId ? data.reservation : r)));
             setRefundAmounts((prev) => ({ ...prev, [reservationId]: '' }));
         } catch (error) {
@@ -69,118 +105,290 @@ export default function AdminReservationsPage() {
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center min-h-[400px]">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+            <div className="flex items-center justify-center min-h-100">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900" />
             </div>
         );
     }
 
     return (
-        <div>
-            <div className="mb-8">
-                <h1 className="text-2xl font-bold text-gray-900">Reservations</h1>
-                <p className="text-gray-500">All bookings across properties.</p>
+        <div className="space-y-6">
+            <div className="flex flex-col gap-1">
+                <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Reservations</h1>
+                <p className="text-sm text-slate-500">{total} booking{total !== 1 ? 's' : ''} across all properties.</p>
             </div>
 
             {reservations.length === 0 ? (
-                <div className="py-20 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-                    <p className="text-gray-400 font-medium mb-4">No reservations found yet.</p>
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 py-20 text-center">
+                    <p className="text-sm font-medium text-slate-500">No reservations found yet.</p>
                 </div>
             ) : (
-                <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
-                    <div className="grid grid-cols-12 gap-4 px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-gray-100">
-                        <div className="col-span-3">Property</div>
-                        <div className="col-span-3">Guest</div>
-                        <div className="col-span-2">Dates</div>
-                        <div className="col-span-2">Payment</div>
-                        <div className="col-span-2 text-right">Refunds</div>
-                    </div>
-                    <div className="divide-y divide-gray-100">
-                        {reservations.map((reservation) => (
-                            <div key={reservation.id} className="grid grid-cols-12 gap-4 px-6 py-5 items-center">
-                                <div className="col-span-3 flex items-center gap-3">
-                                    <img src={reservation.listing?.imageSrc} alt={reservation.listing?.title} className="w-16 h-12 rounded-lg object-cover" />
+                <div className="space-y-4">
+                    {reservations.map((reservation) => {
+                        const status = getStatus(reservation);
+                        const isExpanded = expandedId === reservation.id;
+                        const nights = reservation.nights || 0;
+                        const guestCount = (reservation.adults || 0) + (reservation.children || 0);
+                        const isDeposit = reservation.paymentType === 'deposit';
+
+                        const addressParts = [
+                            reservation.primaryGuestStreetAddress1,
+                            reservation.primaryGuestStreetAddress2,
+                            reservation.primaryGuestCity,
+                            reservation.primaryGuestState,
+                            reservation.primaryGuestPostalCode,
+                            reservation.primaryGuestCountryCode,
+                        ].filter(Boolean);
+                        const fullAddress = addressParts.join(', ') || null;
+
+                        return (
+                            <div key={reservation.id} className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+
+                                {/* ── Header row ── */}
+                                <div className="flex items-start gap-4 p-5">
+                                    <img
+                                        src={reservation.listing?.imageSrc}
+                                        alt={reservation.listing?.title}
+                                        className="w-16 h-14 rounded-lg object-cover border border-slate-200 shrink-0"
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <p className="font-semibold text-slate-900 truncate">{reservation.listing?.title}</p>
+                                            {/* Status badge */}
+                                            <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${STATUS_STYLES[status]}`}>
+                                                {status}
+                                            </span>
+                                            {/* Payment type badge */}
+                                            {isDeposit ? (
+                                                <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700">
+                                                    Deposit
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center rounded-full border border-green-200 bg-green-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-green-700">
+                                                    Fully Paid
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="text-xs text-slate-400 mt-0.5">{reservation.listing?.locationValue}</p>
+                                    </div>
+                                    <button
+                                        onClick={() => setExpandedId(isExpanded ? null : reservation.id)}
+                                        className="shrink-0 text-xs font-medium text-slate-500 hover:text-slate-900 border border-slate-200 rounded-lg px-3 py-1.5"
+                                    >
+                                        {isExpanded ? 'Collapse' : 'Details'}
+                                    </button>
+                                </div>
+
+                                {/* ── Summary row — always visible ── */}
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-5 pb-5 text-sm">
+                                    {/* Guest */}
                                     <div>
-                                        <p className="font-semibold text-gray-900">{reservation.listing?.title}</p>
-                                        <p className="text-xs text-gray-500">{reservation.listing?.locationValue}</p>
+                                        <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1">Guest</p>
+                                        <p className="font-medium text-slate-900">{reservation.primaryGuestName || reservation.user?.name || '—'}</p>
+                                        <p className="text-xs text-slate-500 truncate">{reservation.primaryGuestEmail || reservation.user?.email || '—'}</p>
+                                        {reservation.primaryGuestPhone && (
+                                            <p className="text-xs text-slate-500">{reservation.primaryGuestPhone}</p>
+                                        )}
+                                    </div>
+
+                                    {/* Dates */}
+                                    <div>
+                                        <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1">Stay</p>
+                                        <p className="text-slate-900">{formatDate(reservation.startDate)} → {formatDate(reservation.endDate)}</p>
+                                        <p className="text-xs text-slate-500 mt-0.5">
+                                            {nights} night{nights !== 1 ? 's' : ''} · {guestCount} guest{guestCount !== 1 ? 's' : ''}
+                                            {reservation.pets ? ` · ${reservation.pets} pet${reservation.pets !== 1 ? 's' : ''}` : ''}
+                                        </p>
+                                    </div>
+
+                                    {/* Payment */}
+                                    <div>
+                                        <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1">Payment</p>
+                                        <p className="font-semibold text-slate-900">
+                                            {reservation.amountPaid
+                                                ? formatMoney(reservation.amountPaid, reservation.paymentCurrency)
+                                                : '—'}
+                                            {isDeposit && reservation.totalPrice && (
+                                                <span className="font-normal text-slate-400">
+                                                    {' '}/ {formatDollars(reservation.totalPrice, reservation.paymentCurrency)}
+                                                </span>
+                                            )}
+                                        </p>
+                                        {isDeposit && (
+                                            reservation.balancePaid ? (
+                                                <p className="text-xs font-medium text-green-600 mt-0.5">Balance paid</p>
+                                            ) : (
+                                                <p className="text-xs text-amber-600 font-medium mt-0.5">
+                                                    Balance {reservation.balanceDueAmount ? formatMoney(reservation.balanceDueAmount, reservation.paymentCurrency) : ''} due {reservation.balanceDueDate ? formatDate(reservation.balanceDueDate) : '—'}
+                                                </p>
+                                            )
+                                        )}
+                                        <p className="text-xs text-slate-400 mt-0.5 capitalize">{reservation.paymentStatus || 'unpaid'}</p>
+                                    </div>
+
+                                    {/* Card */}
+                                    <div>
+                                        <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1">Card</p>
+                                        {reservation.cardBrand && reservation.cardLast4 ? (
+                                            <>
+                                                <p className="text-slate-900">{reservation.cardBrand.toUpperCase()} •••• {reservation.cardLast4}</p>
+                                                {reservation.cardExpMonth && reservation.cardExpYear && (
+                                                    <p className="text-xs text-slate-400">exp {reservation.cardExpMonth}/{String(reservation.cardExpYear).slice(-2)}</p>
+                                                )}
+                                            </>
+                                        ) : (
+                                            <p className="text-xs text-slate-400">No card on file</p>
+                                        )}
+                                        {reservation.refundedAmount > 0 && (
+                                            <p className="text-xs text-rose-500 mt-0.5">
+                                                Refunded {formatMoney(reservation.refundedAmount, reservation.paymentCurrency)}
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
-                                <div className="col-span-3 text-sm text-gray-600">
-                                    <p className="font-medium text-gray-900">{reservation.user?.name || 'Guest'}</p>
-                                    <p className="text-xs text-gray-500">{reservation.user?.email}</p>
-                                </div>
-                                <div className="col-span-2 text-sm text-gray-600">
-                                    <p>{formatDate(reservation.startDate)} → {formatDate(reservation.endDate)}</p>
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        Guests: {reservation.adults} Adults{reservation.children ? `, ${reservation.children} Children` : ''}
-                                    </p>
-                                </div>
-                                <div className="col-span-2 text-sm text-gray-700">
-                                    <p className="font-semibold text-gray-900">
-                                        {reservation.amountPaid
-                                            ? formatMoney(reservation.amountPaid, reservation.paymentCurrency)
-                                            : `$${reservation.totalPrice.toFixed(2)}`}
-                                    </p>
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        {reservation.paymentStatus || 'unpaid'}
-                                    </p>
-                                    <p className="text-xs text-gray-500">
-                                        {reservation.cardBrand && reservation.cardLast4
-                                            ? `${reservation.cardBrand.toUpperCase()} •••• ${reservation.cardLast4}${reservation.cardExpMonth && reservation.cardExpYear ? ` · exp ${reservation.cardExpMonth}/${String(reservation.cardExpYear).slice(-2)}` : ''}`
-                                            : 'Card details unavailable'}
-                                    </p>
-                                    <p className="text-xs text-gray-400">Account: Platform</p>
-                                </div>
-                                <div className="col-span-2 text-right">
-                                    <p className="text-xs text-gray-500 mb-2">
-                                        {reservation.refundStatus || 'none'}{reservation.refundedAmount ? ` · ${formatMoney(reservation.refundedAmount, reservation.paymentCurrency)}` : ''}
-                                    </p>
-                                    <div className="flex items-center justify-end gap-2">
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            placeholder="Amount"
-                                            value={refundAmounts[reservation.id] || ''}
-                                            onChange={(e) => setRefundAmounts((prev) => ({ ...prev, [reservation.id]: e.target.value }))}
-                                            className="w-24 px-2 py-1 text-xs border border-gray-200 rounded-lg text-right"
-                                        />
-                                        <button
-                                            onClick={() => {
-                                                const value = refundAmounts[reservation.id];
-                                                const amountCents = value ? Math.round(Number(value) * 100) : undefined;
-                                                handleRefund(reservation.id, amountCents);
-                                            }}
-                                            disabled={isRefunding[reservation.id]}
-                                            className="px-3 py-1 text-xs font-semibold rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
-                                        >
-                                            {isRefunding[reservation.id] ? 'Refunding...' : 'Refund'}
-                                        </button>
+
+                                {/* ── Expanded details ── */}
+                                {isExpanded && (
+                                    <div className="border-t border-slate-100 bg-slate-50 px-5 py-4 space-y-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            {/* Full guest details */}
+                                            <div>
+                                                <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Guest details</p>
+                                                <div className="space-y-1.5">
+                                                    <InfoRow label="Name" value={reservation.primaryGuestName} />
+                                                    <InfoRow label="Email" value={reservation.primaryGuestEmail} />
+                                                    <InfoRow label="Phone" value={reservation.primaryGuestPhone} />
+                                                    <InfoRow label="Address" value={fullAddress} />
+                                                    <InfoRow label="Locale" value={reservation.primaryGuestLocale} />
+                                                </div>
+                                            </div>
+
+                                            {/* Booking meta */}
+                                            <div>
+                                                <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Booking details</p>
+                                                <div className="space-y-1.5">
+                                                    <InfoRow label="Reservation ID" value={reservation.id} />
+                                                    <InfoRow label="Booking source" value={reservation.bookingSource} />
+                                                    <InfoRow label="Guests" value={[
+                                                        reservation.adults && `${reservation.adults} adults`,
+                                                        reservation.children && `${reservation.children} children`,
+                                                        reservation.infants && `${reservation.infants} infants`,
+                                                        reservation.pets && `${reservation.pets} pets`,
+                                                    ].filter(Boolean).join(', ')} />
+                                                    <InfoRow label="Price/night" value={reservation.pricePerNight ? formatDollars(reservation.pricePerNight, reservation.paymentCurrency) : null} />
+                                                    <InfoRow label="Cleaning fee" value={reservation.cleaningFee ? formatDollars(reservation.cleaningFee, reservation.paymentCurrency) : null} />
+                                                    <InfoRow label="Service fee" value={reservation.serviceFee ? formatDollars(reservation.serviceFee, reservation.paymentCurrency) : null} />
+                                                    <InfoRow label="Tax" value={reservation.taxAmount ? formatDollars(reservation.taxAmount, reservation.paymentCurrency) : null} />
+                                                    <InfoRow label="Stripe session" value={reservation.stripeSessionId} />
+                                                    {reservation.balancePaidAt && (
+                                                        <InfoRow label="Balance paid" value={formatDate(reservation.balancePaidAt)} />
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Policy agreements */}
+                                            <div className="md:col-span-2">
+                                                <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Policy agreements</p>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                    {/* Rental Agreement */}
+                                                    <div className={`rounded-lg border px-3 py-2.5 text-xs ${reservation.agreementAcceptedAt ? 'border-green-200 bg-green-50' : 'border-slate-200 bg-slate-100'}`}>
+                                                        <div className="flex items-center gap-1.5 mb-1">
+                                                            <span className={`text-base leading-none ${reservation.agreementAcceptedAt ? 'text-green-600' : 'text-slate-400'}`}>
+                                                                {reservation.agreementAcceptedAt ? '✓' : '✗'}
+                                                            </span>
+                                                            <span className="font-semibold text-slate-800">
+                                                                {reservation.agreementPolicyTitle || 'Rental Agreement'}
+                                                            </span>
+                                                            {reservation.agreementPolicyVersion && (
+                                                                <span className="text-slate-400">v{reservation.agreementPolicyVersion}</span>
+                                                            )}
+                                                        </div>
+                                                        {reservation.agreementAcceptedAt ? (
+                                                            <p className="text-slate-500">Accepted {new Date(reservation.agreementAcceptedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                                                        ) : (
+                                                            <p className="text-slate-400">Not accepted</p>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Payment Policy */}
+                                                    <div className={`rounded-lg border px-3 py-2.5 text-xs ${reservation.paymentPolicyAcceptedAt ? 'border-green-200 bg-green-50' : 'border-slate-200 bg-slate-100'}`}>
+                                                        <div className="flex items-center gap-1.5 mb-1">
+                                                            <span className={`text-base leading-none ${reservation.paymentPolicyAcceptedAt ? 'text-green-600' : 'text-slate-400'}`}>
+                                                                {reservation.paymentPolicyAcceptedAt ? '✓' : '✗'}
+                                                            </span>
+                                                            <span className="font-semibold text-slate-800">
+                                                                {reservation.paymentPolicyTitle || 'Payment Policy'}
+                                                            </span>
+                                                            {reservation.paymentPolicyVersion && (
+                                                                <span className="text-slate-400">v{reservation.paymentPolicyVersion}</span>
+                                                            )}
+                                                        </div>
+                                                        {reservation.paymentPolicyAcceptedAt ? (
+                                                            <p className="text-slate-500">Accepted {new Date(reservation.paymentPolicyAcceptedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                                                        ) : (
+                                                            <p className="text-slate-400">Not accepted</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Refund controls */}
+                                        {reservation.amountPaid > 0 && (
+                                            <div className="pt-3 border-t border-slate-200">
+                                                <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Issue refund</p>
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        step="0.01"
+                                                        placeholder="Amount (USD)"
+                                                        value={refundAmounts[reservation.id] || ''}
+                                                        onChange={(e) => setRefundAmounts((prev) => ({ ...prev, [reservation.id]: e.target.value }))}
+                                                        className="w-36 h-9 px-3 text-xs border border-slate-200 rounded-lg bg-white focus:border-slate-900 outline-none"
+                                                    />
+                                                    <button
+                                                        onClick={() => {
+                                                            const value = refundAmounts[reservation.id];
+                                                            const amountCents = value ? Math.round(Number(value) * 100) : undefined;
+                                                            handleRefund(reservation.id, amountCents);
+                                                        }}
+                                                        disabled={isRefunding[reservation.id]}
+                                                        className="h-9 px-4 text-xs font-medium rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 text-slate-700"
+                                                    >
+                                                        {isRefunding[reservation.id] ? 'Refunding...' : 'Issue Refund'}
+                                                    </button>
+                                                    {reservation.refundStatus && reservation.refundStatus !== 'none' && (
+                                                        <span className="text-xs text-rose-500">
+                                                            {reservation.refundStatus} · {formatMoney(reservation.refundedAmount || 0, reservation.paymentCurrency)} refunded
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
-                                </div>
+                                )}
                             </div>
-                        ))}
-                    </div>
+                        );
+                    })}
                 </div>
             )}
 
             {total > 0 && (
-                <div className="mt-8 flex items-center justify-between">
-                    <p className="text-sm text-gray-500">
-                        Showing page {page} of {totalPages} · {total} total reservations
-                    </p>
+                <div className="flex items-center justify-between pt-2">
+                    <p className="text-sm text-slate-500">Page {page} of {totalPages} · {total} total</p>
                     <div className="flex items-center gap-2">
                         <button
                             onClick={() => setPage((p) => Math.max(1, p - 1))}
                             disabled={page === 1}
-                            className="px-3 py-2 text-xs font-semibold border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                            className="px-3 py-2 text-xs font-medium border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50"
                         >
                             Previous
                         </button>
                         <button
                             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                             disabled={page >= totalPages}
-                            className="px-3 py-2 text-xs font-semibold border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                            className="px-3 py-2 text-xs font-medium border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50"
                         >
                             Next
                         </button>

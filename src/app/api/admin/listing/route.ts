@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { adminAuthOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { normalizeDynamicPricingRules } from "@/lib/pricing";
 
 // Create or update listing
 export async function POST(request: NextRequest) {
@@ -41,10 +42,15 @@ export async function POST(request: NextRequest) {
             taxPercentage = 10,
             taxProfileId = null,
             minStayNights = 1,
+            dynamicPricingRules = [],
             maxGuestsAllowed = null,
             instantBook = false,
             comingSoon = false,
             cancellationPolicy = null,
+            lodgifyPropertyId = null,
+            lodgifyRoomTypeId = null,
+            lodgifyBookingUrl = null,
+            lodgifyWidgetEmbed = null,
             specifications = [],
             advantages = [],
             bedrooms = [],
@@ -61,8 +67,13 @@ export async function POST(request: NextRequest) {
         const parsedServiceFee = serviceFee ? parseInt(String(serviceFee), 10) : null;
         const parsedTaxPercentage = taxPercentage ? parseInt(String(taxPercentage), 10) : 10;
         const parsedMinStayNights = minStayNights ? parseInt(String(minStayNights), 10) : 1;
+        const parsedDynamicPricingRules = normalizeDynamicPricingRules(dynamicPricingRules);
         const parsedMaxGuestsAllowed = maxGuestsAllowed ? parseInt(String(maxGuestsAllowed), 10) : null;
         const parsedTaxProfileId = typeof taxProfileId === "string" && taxProfileId.trim() ? taxProfileId.trim() : null;
+        const parsedLodgifyPropertyId = typeof lodgifyPropertyId === "string" && lodgifyPropertyId.trim() ? lodgifyPropertyId.trim() : null;
+        const parsedLodgifyRoomTypeId = typeof lodgifyRoomTypeId === "string" && lodgifyRoomTypeId.trim() ? lodgifyRoomTypeId.trim() : null;
+        const parsedLodgifyBookingUrl = typeof lodgifyBookingUrl === "string" && lodgifyBookingUrl.trim() ? lodgifyBookingUrl.trim() : null;
+        const parsedLodgifyWidgetEmbed = typeof lodgifyWidgetEmbed === "string" && lodgifyWidgetEmbed.trim() ? lodgifyWidgetEmbed.trim() : null;
 
         if (parsedTaxProfileId) {
             const profileExists = await prisma.taxProfile.findUnique({
@@ -83,6 +94,25 @@ export async function POST(request: NextRequest) {
                 { status: 400 }
             );
         }
+
+        if (parsedBasePricePerNight !== null && parsedBasePricePerNight > 100000) {
+            return NextResponse.json(
+                { error: "Base Price / Night looks too high. Please enter the nightly rate in normal currency units, not cents." },
+                { status: 400 }
+            );
+        }
+
+        const oversizedDynamicRule = parsedDynamicPricingRules.find((rule) => rule.nightlyPrice > 100000);
+        if (oversizedDynamicRule) {
+            return NextResponse.json(
+                { error: `Dynamic pricing rule \"${oversizedDynamicRule.label}\" looks too high. Please enter nightly prices in normal currency units, not cents.` },
+                { status: 400 }
+            );
+        }
+
+        const taxProfileRelation = parsedTaxProfileId
+            ? { connect: { id: parsedTaxProfileId } }
+            : { disconnect: true };
 
         if (id && id !== "new") {
             // Update existing listing - first verify it exists
@@ -124,12 +154,17 @@ export async function POST(request: NextRequest) {
                     ...(parsedCleaningFee && { cleaningFee: parsedCleaningFee }),
                     ...(parsedServiceFee && { serviceFee: parsedServiceFee }),
                     taxPercentage: parsedTaxPercentage,
-                    taxProfileId: parsedTaxProfileId,
+                    taxProfile: taxProfileRelation,
                     minStayNights: parsedMinStayNights,
+                    dynamicPricingRules: parsedDynamicPricingRules as any,
                     ...(parsedMaxGuestsAllowed && { maxGuestsAllowed: parsedMaxGuestsAllowed }),
                     instantBook,
                     comingSoon,
                     ...(cancellationPolicy && { cancellationPolicy }),
+                    lodgifyPropertyId: parsedLodgifyPropertyId,
+                    lodgifyRoomTypeId: parsedLodgifyRoomTypeId,
+                    lodgifyBookingUrl: parsedLodgifyBookingUrl,
+                    lodgifyWidgetEmbed: parsedLodgifyWidgetEmbed,
                 },
                 include: {
                     images: true,
@@ -351,12 +386,19 @@ export async function POST(request: NextRequest) {
                     ...(parsedCleaningFee && { cleaningFee: parsedCleaningFee }),
                     ...(parsedServiceFee && { serviceFee: parsedServiceFee }),
                     taxPercentage: parsedTaxPercentage,
-                    taxProfileId: parsedTaxProfileId,
+                    ...(parsedTaxProfileId
+                        ? { taxProfile: { connect: { id: parsedTaxProfileId } } }
+                        : {}),
                     minStayNights: parsedMinStayNights,
+                    dynamicPricingRules: parsedDynamicPricingRules as any,
                     ...(parsedMaxGuestsAllowed && { maxGuestsAllowed: parsedMaxGuestsAllowed }),
                     instantBook,
                     comingSoon,
                     ...(cancellationPolicy && { cancellationPolicy }),
+                    lodgifyPropertyId: parsedLodgifyPropertyId,
+                    lodgifyRoomTypeId: parsedLodgifyRoomTypeId,
+                    lodgifyBookingUrl: parsedLodgifyBookingUrl,
+                    lodgifyWidgetEmbed: parsedLodgifyWidgetEmbed,
                     images: {
                         create: images.map((url: string, index: number) => ({
                             imageUrl: url,

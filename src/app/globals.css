@@ -81,3 +81,18 @@ body {
 .admin-text-black .text-slate-700 {
   color: #000 !important;
 }
+
+.lodgify-booking-shell {
+  overflow: visible;
+}
+
+.lodgify-booking-shell > * {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+.lodgify-booking-shell iframe,
+.lodgify-booking-shell [class*="lodgify"],
+.lodgify-booking-shell [id*="lodgify"] {
+  max-width: 100% !important;
+}
