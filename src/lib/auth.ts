@@ -176,9 +176,18 @@
             },
         },
         callbacks: {
-            async signIn({ user }: any) {
+            async signIn({ user, account }: any) {
                 if (!user?.email) return true;
                 const dbUser = await prisma.user.findUnique({ where: { email: user.email } });
+                // OAuth (Google etc.): allow new users through — the adapter creates them automatically.
+                // Only block if the account already exists but is deactivated/deleted.
+                if (account?.type === 'oauth') {
+                    if (dbUser && (dbUser.deletedAt || dbUser.status === "DEACTIVATED")) {
+                        return false;
+                    }
+                    return true;
+                }
+                // Credentials (OTP): user must already exist and be active.
                 if (!dbUser || dbUser.deletedAt || dbUser.status === "DEACTIVATED") {
                     return false;
                 }
