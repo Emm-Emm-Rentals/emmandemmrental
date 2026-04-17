@@ -786,7 +786,8 @@ export async function getUnifiedReservationsForUser(userId: string, email?: stri
           },
         })
       : [];
-
+      
+ 
     const listingByPropertyId = new Map(
       matchingListings
         .filter((listing) => listing.lodgifyPropertyId)
