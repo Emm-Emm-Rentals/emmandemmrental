@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { User, Menu, LogOut, Map, Heart } from 'lucide-react';
+import { User, Menu, LogOut } from 'lucide-react';
 import Image from 'next/image';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
@@ -88,8 +88,6 @@ const Navbar = () => {
 
                     <div className="py-2">
                       <MenuItem onClick={() => handleAuthAction(() => { router.push('/profile'); })} label="Profile" icon={<User size={16} />} />
-                      <MenuItem onClick={() => handleAuthAction(() => { })} label="My Trips" icon={<Map size={16} />} />
-                      <MenuItem onClick={() => handleAuthAction(() => { })} label="My Favorites" icon={<Heart size={16} />} />
                     </div>
 
                     <div className="border-t border-gray-100 pt-2">
