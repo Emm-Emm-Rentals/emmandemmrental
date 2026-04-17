@@ -138,6 +138,7 @@ model Listing {
   basePricePerNight     Int?
   cleaningFee           Int?
   serviceFee            Int?
+  petFee                Int?
   taxPercentage         Float?    @default(10)
   taxProfileId          String?
   

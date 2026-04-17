@@ -30,6 +30,7 @@ type BookingBarProps = {
   basePricePerNight?: number | null;
   cleaningFee?: number | null;
   serviceFee?: number | null;
+  petFee?: number | null;
   taxPercentage?: number | null;
   locationValue?: string | null;
   taxProfile?: TaxProfileInput | null;
@@ -145,6 +146,7 @@ const BookingBar = ({
   basePricePerNight = null,
   cleaningFee = null,
   serviceFee = null,
+  petFee = null,
   taxPercentage = null,
   locationValue = null,
   taxProfile = null,
@@ -299,6 +301,8 @@ const BookingBar = ({
       basePricePerNight: fallbackNightlyPrice ?? 0,
       cleaningFee: Number(cleaningFee || 0),
       serviceFee: Number(serviceFee || 0),
+      petFee: Number(petFee || 0),
+      pets: guests.pets,
       taxPercentage: Number(taxPercentage || 0),
       locationValue,
       taxProfile,
@@ -306,6 +310,8 @@ const BookingBar = ({
     });
   }, [
     cleaningFee,
+    petFee,
+    guests.pets,
     dynamicPricingRules,
     endDate,
     fallbackNightlyPrice,

@@ -86,18 +86,7 @@ export async function POST(request: NextRequest) {
 
         const listing = await prisma.listing.findUnique({
             where: { id: listingId },
-            select: {
-                id: true,
-                title: true,
-                imageSrc: true,
-                basePricePerNight: true,
-                price: true,
-                cleaningFee: true,
-                serviceFee: true,
-                taxPercentage: true,
-                minStayNights: true,
-                dynamicPricingRules: true,
-                locationValue: true,
+            include: {
                 taxProfile: {
                     include: {
                         lines: {
@@ -121,12 +110,15 @@ export async function POST(request: NextRequest) {
 
         const cleaningFee = listing.cleaningFee ?? 0;
         const serviceFee = listing.serviceFee ?? 0;
+        const petFeePerPetPerNight = (listing as any).petFee ?? 0;
         const pricing = calculateStayPricingBreakdown({
             startDate: parsedStart,
             endDate: parsedEnd,
             basePricePerNight: listing.basePricePerNight ?? listing.price ?? 0,
             cleaningFee,
             serviceFee,
+            petFee: petFeePerPetPerNight,
+            pets,
             taxPercentage: listing.taxPercentage ?? 0,
             locationValue: listing.locationValue,
             taxProfile: listing.taxProfile || undefined,
@@ -260,6 +252,16 @@ export async function POST(request: NextRequest) {
                                 currency,
                                 product_data: { name: "Service fee" },
                                 unit_amount: Math.round(serviceFee * 100),
+                            },
+                            quantity: 1,
+                        }]
+                        : []),
+                    ...(pricing.petFeeSubtotal > 0
+                        ? [{
+                            price_data: {
+                                currency,
+                                product_data: { name: `Pet fee (${pets} pet${pets !== 1 ? 's' : ''} × ${nights} nights)` },
+                                unit_amount: Math.round(pricing.petFeeSubtotal * 100),
                             },
                             quantity: 1,
                         }]

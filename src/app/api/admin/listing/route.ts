@@ -39,6 +39,7 @@ export async function POST(request: NextRequest) {
             basePricePerNight = null,
             cleaningFee = null,
             serviceFee = null,
+            petFee = null,
             taxPercentage = 10,
             taxProfileId = null,
             minStayNights = 1,
@@ -65,6 +66,7 @@ export async function POST(request: NextRequest) {
         const parsedBasePricePerNight = basePricePerNight ? parseInt(String(basePricePerNight), 10) : null;
         const parsedCleaningFee = cleaningFee ? parseInt(String(cleaningFee), 10) : null;
         const parsedServiceFee = serviceFee ? parseInt(String(serviceFee), 10) : null;
+        const parsedPetFee = petFee ? parseInt(String(petFee), 10) : null;
         const parsedTaxPercentage = taxPercentage ? parseInt(String(taxPercentage), 10) : 10;
         const parsedMinStayNights = minStayNights ? parseInt(String(minStayNights), 10) : 1;
         const parsedDynamicPricingRules = normalizeDynamicPricingRules(dynamicPricingRules);
@@ -153,6 +155,7 @@ export async function POST(request: NextRequest) {
                     ...(parsedBasePricePerNight && { basePricePerNight: parsedBasePricePerNight }),
                     ...(parsedCleaningFee && { cleaningFee: parsedCleaningFee }),
                     ...(parsedServiceFee && { serviceFee: parsedServiceFee }),
+                    ...(parsedPetFee !== null && { petFee: parsedPetFee }),
                     taxPercentage: parsedTaxPercentage,
                     taxProfile: taxProfileRelation,
                     minStayNights: parsedMinStayNights,
@@ -385,6 +388,7 @@ export async function POST(request: NextRequest) {
                     ...(parsedBasePricePerNight && { basePricePerNight: parsedBasePricePerNight }),
                     ...(parsedCleaningFee && { cleaningFee: parsedCleaningFee }),
                     ...(parsedServiceFee && { serviceFee: parsedServiceFee }),
+                    ...(parsedPetFee !== null && { petFee: parsedPetFee }),
                     taxPercentage: parsedTaxPercentage,
                     ...(parsedTaxProfileId
                         ? { taxProfile: { connect: { id: parsedTaxProfileId } } }

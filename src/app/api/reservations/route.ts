@@ -74,16 +74,7 @@ export async function POST(request: NextRequest) {
 
         const listing = await prisma.listing.findUnique({
             where: { id: listingId },
-            select: {
-                id: true,
-                basePricePerNight: true,
-                price: true,
-                cleaningFee: true,
-                serviceFee: true,
-                taxPercentage: true,
-                minStayNights: true,
-                dynamicPricingRules: true,
-                locationValue: true,
+            include: {
                 taxProfile: {
                     include: {
                         lines: {
@@ -107,12 +98,15 @@ export async function POST(request: NextRequest) {
 
         const cleaningFee = listing.cleaningFee ?? 0;
         const serviceFee = listing.serviceFee ?? 0;
+        const petFeePerPetPerNight = (listing as any).petFee ?? 0;
         const pricing = calculateStayPricingBreakdown({
             startDate: parsedStart,
             endDate: parsedEnd,
             basePricePerNight: listing.basePricePerNight ?? listing.price ?? 0,
             cleaningFee,
             serviceFee,
+            petFee: petFeePerPetPerNight,
+            pets,
             taxPercentage: listing.taxPercentage ?? 0,
             locationValue: listing.locationValue,
             taxProfile: listing.taxProfile || undefined,

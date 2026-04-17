@@ -115,6 +115,7 @@ export default function ListingForm({ initialData, onSubmit, isLoading = false }
         basePricePerNight: initialData?.basePricePerNight || '',
         cleaningFee: initialData?.cleaningFee || '',
         serviceFee: initialData?.serviceFee || '',
+        petFee: initialData?.petFee || '',
         taxPercentage: initialData?.taxPercentage || '10',
         taxProfileId: initialData?.taxProfileId || '',
         minStayNights: initialData?.minStayNights || '1',
@@ -226,6 +227,7 @@ export default function ListingForm({ initialData, onSubmit, isLoading = false }
             basePricePerNight: initialData?.basePricePerNight || '',
             cleaningFee: initialData?.cleaningFee || '',
             serviceFee: initialData?.serviceFee || '',
+            petFee: initialData?.petFee || '',
             taxPercentage: initialData?.taxPercentage || '10',
             taxProfileId: initialData?.taxProfileId || '',
             minStayNights: initialData?.minStayNights || '1',
@@ -851,6 +853,7 @@ export default function ListingForm({ initialData, onSubmit, isLoading = false }
                                 <ModernInput label="Base Price / Night" icon={DollarSign} value={formData.basePricePerNight} onChange={(e: any) => handleFieldChange('basePricePerNight', e.target.value)} />
                                 <ModernInput label="Cleaning Fee" icon={DollarSign} value={formData.cleaningFee} onChange={(e: any) => handleFieldChange('cleaningFee', e.target.value)} />
                                 <ModernInput label="Service Fee" icon={DollarSign} value={formData.serviceFee} onChange={(e: any) => handleFieldChange('serviceFee', e.target.value)} />
+                                <ModernInput label="Pet Fee (per pet/night)" icon={DollarSign} value={formData.petFee} onChange={(e: any) => handleFieldChange('petFee', e.target.value)} />
                                 <div className="space-y-2">
                                     <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.16em] ml-0.5">Tax Profile</label>
                                     <select

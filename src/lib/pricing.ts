@@ -49,6 +49,8 @@ export type PricingInput = {
   pricePerNight: number;
   cleaningFee: number;
   serviceFee: number;
+  petFee?: number | null;
+  pets?: number | null;
   locationValue?: string | null;
   taxPercentage?: number | null;
   taxProfile?: TaxProfileInput | null;
@@ -56,6 +58,7 @@ export type PricingInput = {
 
 export type PricingBreakdown = {
   nightlySubtotal: number;
+  petFeeSubtotal: number;
   subtotal: number;
   taxableBase: number;
   totalTaxRate: number;
@@ -72,6 +75,8 @@ export type StayPricingInput = {
   basePricePerNight: number;
   cleaningFee: number;
   serviceFee: number;
+  petFee?: number | null;
+  pets?: number | null;
   locationValue?: string | null;
   taxPercentage?: number | null;
   taxProfile?: TaxProfileInput | null;
@@ -209,6 +214,7 @@ const calculateBreakdownFromSubtotals = ({
   nightlySubtotal,
   cleaningFee,
   serviceFee,
+  petFeeSubtotal = 0,
   locationValue,
   taxPercentage,
   taxProfile,
@@ -216,13 +222,14 @@ const calculateBreakdownFromSubtotals = ({
   nightlySubtotal: number;
   cleaningFee: number;
   serviceFee: number;
+  petFeeSubtotal?: number;
   locationValue?: string | null;
   taxPercentage?: number | null;
   taxProfile?: TaxProfileInput | null;
 }): PricingBreakdown => {
   const cleaningSubtotal = roundToCurrency(cleaningFee);
   const serviceSubtotal = roundToCurrency(serviceFee);
-  const subtotal = nightlySubtotal + cleaningSubtotal + serviceSubtotal;
+  const subtotal = nightlySubtotal + cleaningSubtotal + serviceSubtotal + petFeeSubtotal;
   const taxableBase = subtotal;
   const safeTaxPercentage = Math.max(0, Number(taxPercentage || 0));
   const safeVatRate = Math.max(0, Number(taxProfile?.vatRate || 0));
@@ -297,6 +304,7 @@ const calculateBreakdownFromSubtotals = ({
 
   return {
     nightlySubtotal,
+    petFeeSubtotal,
     subtotal,
     taxableBase,
     totalTaxRate,
@@ -313,15 +321,19 @@ export const calculatePricingBreakdown = ({
   pricePerNight,
   cleaningFee,
   serviceFee,
+  petFee,
+  pets,
   locationValue,
   taxPercentage,
   taxProfile,
 }: PricingInput): PricingBreakdown => {
   const nightlySubtotal = roundToCurrency(pricePerNight * nights);
+  const petFeeSubtotal = petFee && pets ? roundToCurrency(petFee * pets * nights) : 0;
   return calculateBreakdownFromSubtotals({
     nightlySubtotal,
     cleaningFee,
     serviceFee,
+    petFeeSubtotal,
     taxPercentage,
     locationValue,
     taxProfile,
@@ -334,6 +346,8 @@ export const calculateStayPricingBreakdown = ({
   basePricePerNight,
   cleaningFee,
   serviceFee,
+  petFee,
+  pets,
   taxPercentage,
   locationValue,
   taxProfile,
@@ -347,10 +361,12 @@ export const calculateStayPricingBreakdown = ({
   });
   const nights = nightlyRates.length;
   const nightlySubtotal = nightlyRates.reduce((sum, night) => sum + night.price, 0);
+  const petFeeSubtotal = petFee && pets ? roundToCurrency(petFee * pets * nights) : 0;
   const breakdown = calculateBreakdownFromSubtotals({
     nightlySubtotal,
     cleaningFee,
     serviceFee,
+    petFeeSubtotal,
     taxPercentage,
     locationValue,
     taxProfile,

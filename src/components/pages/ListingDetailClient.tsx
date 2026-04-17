@@ -59,6 +59,7 @@ type ListingDetail = {
   basePricePerNight?: number | null;
   cleaningFee?: number | null;
   serviceFee?: number | null;
+  petFee?: number | null;
   taxPercentage?: number | null;
   minStayNights?: number | null;
   dynamicPricingRules?: unknown[];
@@ -232,6 +233,7 @@ export default function ListingDetailClient({
           basePricePerNight={listing.basePricePerNight}
           cleaningFee={listing.cleaningFee}
           serviceFee={listing.serviceFee}
+          petFee={listing.petFee}
           taxPercentage={listing.taxPercentage}
           locationValue={listing.locationValue}
           taxProfile={listing.taxProfile}
