@@ -17,6 +17,7 @@ type ListingData = {
     price?: number | null;
     cleaningFee?: number | null;
     serviceFee?: number | null;
+    petFee?: number | null;
     taxPercentage?: number | null;
     dynamicPricingRules?: unknown[];
     locationValue?: string | null;
@@ -152,12 +153,15 @@ export default function BookingConfirmPage() {
         if (!listing) return null;
         const cleaningFee = listing.cleaningFee ?? 0;
         const serviceFee = listing.serviceFee ?? 0;
+        const petFeePerPetPerNight = listing.petFee ?? 0;
         const calculated = calculateStayPricingBreakdown({
             startDate,
             endDate,
             basePricePerNight: listing.basePricePerNight ?? listing.price ?? 0,
             cleaningFee,
             serviceFee,
+            petFee: petFeePerPetPerNight,
+            pets,
             taxPercentage: listing.taxPercentage ?? 0,
             locationValue: listing.locationValue,
             taxProfile: listing.taxProfile || undefined,
@@ -567,6 +571,12 @@ export default function BookingConfirmPage() {
                                     <div className="flex items-center justify-between">
                                         <span>Service fee</span>
                                         <span>{formatMoney(pricing.serviceFee)}</span>
+                                    </div>
+                                )}
+                                {pricing.petFeeSubtotal > 0 && (
+                                    <div className="flex items-center justify-between">
+                                        <span>Pet fee ({pets} pet{pets !== 1 ? 's' : ''} × {pricing.nights} nights)</span>
+                                        <span>{formatMoney(pricing.petFeeSubtotal)}</span>
                                     </div>
                                 )}
                                 {pricing.taxLines.map((line) => (
