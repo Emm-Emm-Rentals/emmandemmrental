@@ -60,15 +60,19 @@ export default function AdminReservationsPage() {
     const [pageSize] = useState(10);
     const [totalPages, setTotalPages] = useState(1);
     const [total, setTotal] = useState(0);
+    const [statusFilter, setStatusFilter] = useState<'all' | 'cancelled'>('all');
     const [refundAmounts, setRefundAmounts] = useState<Record<string, string>>({});
     const [isRefunding, setIsRefunding] = useState<Record<string, boolean>>({});
+    const [isSyncing, setIsSyncing] = useState<Record<string, boolean>>({});
     const [expandedId, setExpandedId] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchReservations = async () => {
             try {
                 setIsLoading(true);
-                const response = await fetch(`/api/admin/reservations?page=${page}&pageSize=${pageSize}`);
+                const response = await fetch(
+                    `/api/admin/reservations?page=${page}&pageSize=${pageSize}&status=${statusFilter}`
+                );
                 if (!response.ok) throw new Error('Failed to fetch reservations');
                 const data = await response.json();
                 setReservations(data.data || []);
@@ -81,7 +85,25 @@ export default function AdminReservationsPage() {
             }
         };
         fetchReservations();
-    }, [page]);
+    }, [page, statusFilter]);
+
+    const handleSyncLodgify = async (reservationId: string) => {
+        try {
+            setIsSyncing((prev) => ({ ...prev, [reservationId]: true }));
+            const response = await fetch('/api/admin/reservations/sync-lodgify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reservationId }),
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Sync failed');
+            setReservations((prev) => prev.map((r) => (r.id === reservationId ? { ...r, ...data.reservation } : r)));
+        } catch (error: any) {
+            alert(error.message || 'Lodgify sync failed');
+        } finally {
+            setIsSyncing((prev) => ({ ...prev, [reservationId]: false }));
+        }
+    };
 
     const handleRefund = async (reservationId: string, amountCents?: number) => {
         try {
@@ -113,9 +135,25 @@ export default function AdminReservationsPage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col gap-1">
-                <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Reservations</h1>
-                <p className="text-sm text-slate-500">{total} booking{total !== 1 ? 's' : ''} across all properties.</p>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div className="flex flex-col gap-1">
+                    <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Reservations</h1>
+                    <p className="text-sm text-slate-500">{total} booking{total !== 1 ? 's' : ''} {statusFilter === 'cancelled' ? 'cancelled' : 'across all properties'}.</p>
+                </div>
+                <div className="flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
+                    <button
+                        onClick={() => { setStatusFilter('all'); setPage(1); }}
+                        className={`px-4 py-2 text-xs font-medium ${statusFilter === 'all' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+                    >
+                        All
+                    </button>
+                    <button
+                        onClick={() => { setStatusFilter('cancelled'); setPage(1); }}
+                        className={`px-4 py-2 text-xs font-medium ${statusFilter === 'cancelled' ? 'bg-rose-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+                    >
+                        Cancelled
+                    </button>
+                </div>
             </div>
 
             {reservations.length === 0 ? (
@@ -282,6 +320,30 @@ export default function AdminReservationsPage() {
                                                     <InfoRow label="Stripe session" value={reservation.stripeSessionId} />
                                                     {reservation.balancePaidAt && (
                                                         <InfoRow label="Balance paid" value={formatDate(reservation.balancePaidAt)} />
+                                                    )}
+                                                    <div className="flex gap-2 text-xs items-center">
+                                                        <span className="w-24 shrink-0 text-slate-400">Lodgify sync</span>
+                                                        <span className={`font-medium ${reservation.lodgifySyncStatus === 'synced' ? 'text-green-600' : reservation.lodgifySyncStatus === 'failed' ? 'text-red-500' : 'text-amber-500'}`}>
+                                                            {reservation.lodgifySyncStatus || 'pending'}
+                                                        </span>
+                                                        {reservation.lodgifyReservationId && (
+                                                            <span className="text-slate-400 font-mono">#{reservation.lodgifyReservationId}</span>
+                                                        )}
+                                                        {reservation.lodgifySyncStatus !== 'synced' && (
+                                                            <button
+                                                                onClick={() => handleSyncLodgify(reservation.id)}
+                                                                disabled={isSyncing[reservation.id]}
+                                                                className="ml-1 px-2 py-0.5 rounded border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-50 text-[10px] font-semibold"
+                                                            >
+                                                                {isSyncing[reservation.id] ? 'Syncing...' : 'Retry Sync'}
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                    {reservation.lodgifySyncError && (
+                                                        <div className="flex gap-2 text-xs">
+                                                            <span className="w-24 shrink-0 text-slate-400">Sync error</span>
+                                                            <span className="text-red-500 break-all">{reservation.lodgifySyncError}</span>
+                                                        </div>
                                                     )}
                                                 </div>
                                             </div>

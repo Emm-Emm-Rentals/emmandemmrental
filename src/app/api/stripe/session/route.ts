@@ -45,7 +45,9 @@ export async function GET(request: NextRequest) {
 
         const reservation = await upsertReservationFromCheckoutSession(checkoutSession);
         if (!reservation) {
-            return NextResponse.json({ error: "Reservation not ready" }, { status: 202 });
+            // Payment confirmed but reservation not processable yet — use 404 so
+            // response.ok is false and the success page keeps polling correctly.
+            return NextResponse.json({ error: "Reservation not ready" }, { status: 404 });
         }
 
         return NextResponse.json(reservation);

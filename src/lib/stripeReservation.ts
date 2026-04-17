@@ -4,6 +4,7 @@ import { calculateNights, parseDate } from "@/lib/booking";
 import { stripe } from "@/lib/stripe";
 import { calculateStayPricingBreakdown } from "@/lib/pricing";
 import { syncReservationToLodgify } from "@/lib/lodgify";
+import { sendBookingConfirmationToUser, sendBookingNotificationToAdmin } from "@/lib/email";
 
 type ReservationSyncTarget = {
     id: string;
@@ -265,16 +266,70 @@ export const upsertReservationFromCheckoutSession = async (
             })
             : existing;
 
-        if ((updated.lodgifySyncStatus || '').toLowerCase() !== 'synced') {
-            try {
-                await syncReservationToLodgify(buildReservationSyncTarget(updated));
-            } catch (error) {
-                await refreshReservationSyncState(
-                    updated.id,
-                    'failed',
-                    error instanceof Error ? error.message : 'Failed to sync to Lodgify'
-                );
+        // Only sync if there is no Lodgify reservation ID yet.
+        // Using an atomic conditional update as a mutex: we set lodgifySyncStatus to
+        // 'syncing' only if it is currently 'pending' (and lodgifyReservationId is null).
+        // This prevents two concurrent webhook retries from both kicking off a Lodgify booking.
+        if (!updated.lodgifyReservationId) {
+            const claimed = await prisma.reservation.updateMany({
+                where: {
+                    id: updated.id,
+                    lodgifyReservationId: null,
+                    lodgifySyncStatus: { not: 'syncing' },
+                },
+                data: { lodgifySyncStatus: 'syncing' },
+            });
+
+            if (claimed.count > 0) {
+                // We won the race — proceed with Lodgify sync
+                try {
+                    await syncReservationToLodgify(buildReservationSyncTarget({ ...updated, lodgifySyncStatus: 'syncing' }));
+                } catch (error) {
+                    await refreshReservationSyncState(
+                        updated.id,
+                        'failed',
+                        error instanceof Error ? error.message : 'Failed to sync to Lodgify'
+                    );
+                }
             }
+            // else: another process already claimed the sync slot — skip to avoid duplicate
+        }
+
+        // Send confirmation emails the first time we record the charge details.
+        // !existing.stripeChargeId means this is the first payment-completion event.
+        if (!existing.stripeChargeId) {
+            const guestEmail = updated.primaryGuestEmail || (updated as any).user?.email;
+            if (guestEmail) {
+                sendBookingConfirmationToUser({
+                    id: updated.id,
+                    listingTitle: (updated as any).listing?.title || 'Your reservation',
+                    startDate: updated.startDate,
+                    endDate: updated.endDate,
+                    nights: updated.nights,
+                    adults: updated.adults,
+                    children: updated.children,
+                    totalPrice: updated.totalPrice,
+                    currency: updated.paymentCurrency || 'USD',
+                    guestName: updated.primaryGuestName || (updated as any).user?.name,
+                    guestEmail,
+                }).catch((err) => console.error('[email] booking confirmation failed', err));
+            }
+
+            sendBookingNotificationToAdmin({
+                id: updated.id,
+                listingTitle: (updated as any).listing?.title || 'Unknown listing',
+                startDate: updated.startDate,
+                endDate: updated.endDate,
+                nights: updated.nights,
+                adults: updated.adults,
+                children: updated.children,
+                totalPrice: updated.totalPrice,
+                currency: updated.paymentCurrency || 'USD',
+                guestName: updated.primaryGuestName || (updated as any).user?.name,
+                guestEmail: updated.primaryGuestEmail || (updated as any).user?.email,
+                guestPhone: updated.primaryGuestPhone,
+                paymentStatus: updated.paymentStatus,
+            }).catch((err) => console.error('[email] admin booking notification failed', err));
         }
 
         return updated;
@@ -413,15 +468,62 @@ export const upsertReservationFromCheckoutSession = async (
         },
     });
 
-    try {
-        await syncReservationToLodgify(buildReservationSyncTarget(reservation));
-    } catch (error) {
-        await refreshReservationSyncState(
-            reservation.id,
-            'failed',
-            error instanceof Error ? error.message : 'Failed to sync to Lodgify'
-        );
+    // Atomically claim the sync slot before calling Lodgify, so a concurrent
+    // webhook retry cannot also kick off a booking creation.
+    const claimed = await prisma.reservation.updateMany({
+        where: {
+            id: reservation.id,
+            lodgifyReservationId: null,
+            lodgifySyncStatus: { not: 'syncing' },
+        },
+        data: { lodgifySyncStatus: 'syncing' },
+    });
+
+    if (claimed.count > 0) {
+        try {
+            await syncReservationToLodgify(buildReservationSyncTarget({ ...reservation, lodgifySyncStatus: 'syncing' }));
+        } catch (error) {
+            await refreshReservationSyncState(
+                reservation.id,
+                'failed',
+                error instanceof Error ? error.message : 'Failed to sync to Lodgify'
+            );
+        }
     }
+
+    // Send confirmation emails — fire-and-forget so email failures never break the booking
+    const guestEmail = reservation.primaryGuestEmail || reservation.user?.email;
+    if (guestEmail) {
+        sendBookingConfirmationToUser({
+            id: reservation.id,
+            listingTitle: reservation.listing?.title || 'Your reservation',
+            startDate: reservation.startDate,
+            endDate: reservation.endDate,
+            nights: reservation.nights,
+            adults: reservation.adults,
+            children: reservation.children,
+            totalPrice: reservation.totalPrice,
+            currency: reservation.paymentCurrency || 'USD',
+            guestName: reservation.primaryGuestName || reservation.user?.name,
+            guestEmail,
+        }).catch((err) => console.error('[email] booking confirmation failed', err));
+    }
+
+    sendBookingNotificationToAdmin({
+        id: reservation.id,
+        listingTitle: reservation.listing?.title || 'Unknown listing',
+        startDate: reservation.startDate,
+        endDate: reservation.endDate,
+        nights: reservation.nights,
+        adults: reservation.adults,
+        children: reservation.children,
+        totalPrice: reservation.totalPrice,
+        currency: reservation.paymentCurrency || 'USD',
+        guestName: reservation.primaryGuestName || reservation.user?.name,
+        guestEmail: reservation.primaryGuestEmail || reservation.user?.email,
+        guestPhone: reservation.primaryGuestPhone,
+        paymentStatus: reservation.paymentStatus,
+    }).catch((err) => console.error('[email] admin booking notification failed', err));
 
     return reservation;
 };

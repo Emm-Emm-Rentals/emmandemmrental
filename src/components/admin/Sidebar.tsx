@@ -14,7 +14,8 @@ import {
     Receipt,
     Settings,
     Menu,
-    X
+    X,
+    CircleOff
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -30,6 +31,7 @@ const Sidebar = () => {
         { label: 'Payments', href: '/admin/payments', icon: <CreditCard size={20} /> },
         { label: 'Policies', href: '/admin/policies', icon: <FileText size={20} /> },
         { label: 'Tax Profiles', href: '/admin/tax-profiles', icon: <Receipt size={20} /> },
+        { label: 'Cancellations', href: '/admin/cancellation-requests', icon: <CircleOff size={20} /> },
         { label: 'Audit Logs', href: '/admin/audit-logs', icon: <ScrollText size={20} /> },
     ];
 

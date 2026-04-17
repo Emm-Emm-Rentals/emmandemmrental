@@ -615,16 +615,20 @@ function buildLodgifyCancelUrl(reservationId: string) {
 }
 
 export async function cancelLodgifyReservationById(reservationId: string) {
+  // We DECLINE (status update) rather than DELETE so the record is preserved in Lodgify.
+  // PUT /v1/reservation/{id} with status "Declined" keeps the booking history intact
+  // and frees the dates on the Lodgify calendar.
   const url = buildLodgifyCancelUrl(reservationId);
-  logLodgifyDebug('cancelling reservation', { reservationId, url });
+  logLodgifyDebug('declining reservation', { reservationId, url });
 
   const response = await fetch(url, {
-    method: 'DELETE',
+    method: 'PUT',
     headers: {
       Accept: 'application/json, text/plain, */*',
       'Content-Type': 'application/json',
       'X-ApiKey': getLodgifyApiKey(),
     },
+    body: JSON.stringify({ status: 'Declined' }),
     cache: 'no-store',
   });
 
@@ -638,7 +642,7 @@ export async function cancelLodgifyReservationById(reservationId: string) {
     }
   }
 
-  logLodgifyDebug('cancel response', {
+  logLodgifyDebug('decline response', {
     reservationId,
     status: response.status,
     payload,
@@ -720,10 +724,18 @@ export async function getUnifiedReservationsForUser(userId: string, email?: stri
     const linkedLodgifyReservation = reservation.lodgifyReservationId
       ? lodgifyReservationById.get(reservation.lodgifyReservationId)
       : undefined;
-    const localStatus = linkedLodgifyReservation?.status || 'Confirmed';
-    const isCanceled = linkedLodgifyReservation
-      ? CANCELED_STATUSES.has(localStatus.toLowerCase())
-      : false;
+    const ps = ((reservation as any).paymentStatus || '').toLowerCase();
+    const isCanceled =
+      ps === 'cancelled' ||
+      ps === 'canceled' ||
+      (linkedLodgifyReservation
+        ? CANCELED_STATUSES.has((linkedLodgifyReservation.status || '').toLowerCase())
+        : false);
+    // For local reservations show a human-readable status derived from paymentStatus,
+    // falling back to the linked Lodgify status, then 'Confirmed'.
+    const localStatus = isCanceled
+      ? 'Cancelled'
+      : linkedLodgifyReservation?.status || 'Confirmed';
     const isPast = reservation.endDate < now;
 
     return {
@@ -1061,8 +1073,16 @@ const extractLodgifyReservationId = (payload: any) => {
 };
 
 export async function syncReservationToLodgify(reservation: LodgifySyncReservationInput) {
-  const currentStatus = (reservation.lodgifySyncStatus || '').toLowerCase();
-  if (reservation.lodgifyReservationId && currentStatus === 'synced') {
+  // If a Lodgify reservation ID already exists, a booking was already created in Lodgify.
+  // Never create a second one — just ensure our local record reflects synced status.
+  if (reservation.lodgifyReservationId) {
+    const currentStatus = (reservation.lodgifySyncStatus || '').toLowerCase();
+    if (currentStatus !== 'synced') {
+      await prisma.reservation.update({
+        where: { id: reservation.id },
+        data: { lodgifySyncStatus: 'synced', lodgifySyncError: null, lodgifySyncedAt: new Date() },
+      });
+    }
     return {
       lodgifyReservationId: reservation.lodgifyReservationId,
       lodgifySyncStatus: 'synced' as const,

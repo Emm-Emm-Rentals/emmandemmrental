@@ -15,10 +15,17 @@ export async function GET(request: NextRequest) {
         const page = Math.max(parseInt(params.get("page") || "1", 10), 1);
         const pageSize = Math.min(Math.max(parseInt(params.get("pageSize") || "10", 10), 1), 100);
         const skip = (page - 1) * pageSize;
+        const statusFilter = params.get("status") || "all";
 
-        const total = await prisma.reservation.count();
+        const where =
+            statusFilter === "cancelled"
+                ? { paymentStatus: { in: ["cancelled", "canceled"] } }
+                : {};
+
+        const total = await prisma.reservation.count({ where });
 
         const reservations = await prisma.reservation.findMany({
+            where,
             include: {
                 user: {
                     select: { id: true, name: true, email: true },

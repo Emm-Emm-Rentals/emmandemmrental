@@ -9,6 +9,7 @@ import {
   addDays,
   isWithinInterval,
   isBefore,
+  isAfter,
   startOfDay,
   differenceInCalendarDays,
   startOfMonth,
@@ -169,14 +170,29 @@ const BookingBar = ({
   const [lodgifyCurrency, setLodgifyCurrency] = useState<string>('USD');
   const [unavailableDates, setUnavailableDates] = useState<Set<string>>(new Set());
   const [isCalendarAvailabilityLoading, setIsCalendarAvailabilityLoading] = useState(false);
+  const [hoverDate, setHoverDate] = useState<Date | null>(null);
 
   const safeMinStay = Math.max(1, Number(minStayNights || 1));
   const safeMaxGuests = Math.max(1, Number(maxGuests || 8));
+
   const fallbackNightlyPrice = typeof basePricePerNight === 'number' ? basePricePerNight : null;
   const effectiveLodgifyPropertyId =
     lodgifyPropertyId ||
     (lodgifyBookingUrl || lodgifyWidgetEmbed ? HARDCODED_LODGIFY_PROPERTY_ID : null);
   const isLodgifyMode = Boolean(effectiveLodgifyPropertyId);
+
+  // First unavailable date strictly after check-in — checkout can land ON it (guest leaves that day)
+  // but the range cannot extend past it.
+  const maxCheckoutDate = useMemo(() => {
+    if (!startDate || !isLodgifyMode || unavailableDates.size === 0) return null;
+    let cursor = addDays(startDate, 1);
+    const limit = addDays(startDate, 730);
+    while (isBefore(cursor, limit)) {
+      if (unavailableDates.has(format(cursor, 'yyyy-MM-dd'))) return cursor;
+      cursor = addDays(cursor, 1);
+    }
+    return null;
+  }, [startDate, unavailableDates, isLodgifyMode]);
 
   useEffect(() => {
     console.log('[booking-bar] mode', {
@@ -520,21 +536,83 @@ const BookingBar = ({
                   const isEnd = endDate && isSameDay(day, endDate);
                   const isRange = startDate && endDate && isWithinInterval(day, { start: startDate, end: endDate });
                   const isPast = isBefore(day, startOfDay(new Date()));
-                  const isUnavailable =
-                    isLodgifyMode && unavailableDates.has(format(day, 'yyyy-MM-dd'));
+                  const isUnavailable = isLodgifyMode && unavailableDates.has(format(day, 'yyyy-MM-dd'));
+
+                  // While picking checkout: highlight hover range between startDate and hoverDate
+                  const isHoverRange =
+                    calendarSelection === 'checkOut' &&
+                    startDate &&
+                    !endDate &&
+                    hoverDate &&
+                    isAfter(day, startDate) &&
+                    isBefore(day, hoverDate);
+
+                  // A day is the hover endpoint (preview checkout circle)
+                  const isHoverEnd =
+                    calendarSelection === 'checkOut' &&
+                    startDate &&
+                    !endDate &&
+                    hoverDate &&
+                    isSameDay(day, hoverDate);
+
+                  // Disable checkout dates that violate min-stay or cross an unavailable date
+                  const isTooCloseForCheckout =
+                    calendarSelection === 'checkOut' &&
+                    startDate &&
+                    !endDate &&
+                    !isSameDay(day, startDate) &&
+                    differenceInCalendarDays(day, startDate) < safeMinStay &&
+                    isAfter(day, startDate);
+
+                  const isPastMaxCheckout =
+                    calendarSelection === 'checkOut' &&
+                    maxCheckoutDate !== null &&
+                    isAfter(day, maxCheckoutDate);
+
+                  const isDisabled =
+                    !isCurrentMonth ||
+                    isPast ||
+                    isUnavailable ||
+                    isTooCloseForCheckout ||
+                    isPastMaxCheckout;
+
+                  // Show confirmed range OR hover preview range background
+                  const showRangeBg = (isRange && !isStart && !isEnd) || isHoverRange;
 
                   return (
                     <div key={i} className="relative py-1 flex justify-center items-center">
-                      {isRange && !isStart && !isEnd && (
+                      {showRangeBg && (
                         <div className="absolute inset-y-1 left-0 right-0 bg-gray-100" />
                       )}
                       <button
                         onClick={() => handleDateClick(day)}
-                        disabled={!isCurrentMonth || isPast || isUnavailable}
+                        onMouseEnter={() => {
+                          if (calendarSelection === 'checkOut' && startDate && !endDate && !isDisabled) {
+                            setHoverDate(day);
+                          }
+                        }}
+                        onMouseLeave={() => setHoverDate(null)}
+                        disabled={isDisabled}
+                        title={
+                          isTooCloseForCheckout
+                            ? `Minimum stay: ${safeMinStay} night${safeMinStay > 1 ? 's' : ''}`
+                            : isPastMaxCheckout
+                            ? 'Not available for this range'
+                            : undefined
+                        }
                         className={`
                           relative z-10 w-9 h-9 md:w-11 md:h-11 flex items-center justify-center font-bold rounded-full transition-all
-                          ${!isCurrentMonth ? 'text-transparent cursor-default' : isPast ? 'text-gray-300 cursor-not-allowed' : isUnavailable ? 'bg-rose-50 text-rose-300 cursor-not-allowed border border-rose-100' : 'text-gray-900 hover:bg-gray-100'}
+                          ${!isCurrentMonth
+                            ? 'text-transparent cursor-default'
+                            : isPast
+                            ? 'text-gray-300 cursor-not-allowed'
+                            : isUnavailable
+                            ? 'bg-rose-50 text-rose-300 cursor-not-allowed border border-rose-100'
+                            : isTooCloseForCheckout || isPastMaxCheckout
+                            ? 'text-gray-300 cursor-not-allowed'
+                            : 'text-gray-900 hover:bg-gray-100'}
                           ${(isStart || isEnd) ? 'bg-zinc-900 text-white hover:bg-zinc-900' : ''}
+                          ${isHoverEnd && !isEnd ? 'bg-zinc-700 text-white' : ''}
                           ${isUnavailable && !(isStart || isEnd) ? 'line-through opacity-80' : ''}
                         `}
                       >
