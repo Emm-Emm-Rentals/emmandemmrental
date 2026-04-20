@@ -212,7 +212,105 @@ export async function sendCancellationRequestToAdmin(req: {
   });
 }
 
-// ─── 4. Cancellation Decision → Guest ────────────────────────────────────────
+// ─── 4. Refund Initiated → Guest ─────────────────────────────────────────────
+
+export async function sendRefundInitiatedToUser(req: {
+  listingTitle: string;
+  startDate: Date | string;
+  endDate: Date | string;
+  refundAmount: number;
+  currency?: string;
+  adminNote?: string | null;
+  guestName?: string | null;
+  guestEmail: string;
+}) {
+  if (!process.env.RESEND_API_KEY) return;
+
+  const html = baseLayout(`
+    <div style="display:inline-block;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700;
+         background:#dcfce7;color:#16a34a;margin-bottom:16px;">
+      ✓ REFUND INITIATED
+    </div>
+    <h2 style="margin:0 0 8px;font-size:22px;font-weight:800;color:#111827;">Your refund is on the way</h2>
+    <p style="margin:0 0 20px;color:#6b7280;font-size:15px;">
+      Hi ${req.guestName || 'there'}, we have initiated a refund for your reservation. Please allow 5–10 business days for it to appear on your original payment method.
+    </p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin:0 0 20px;">
+      ${[
+        ['Property', req.listingTitle],
+        ['Check-in', formatDate(req.startDate)],
+        ['Check-out', formatDate(req.endDate)],
+        ['Refund amount', `<strong style="color:#16a34a;">${formatMoney(req.refundAmount / 100, req.currency)}</strong>`],
+      ].map(([label, value], i) => `
+      <tr style="background:${i % 2 === 0 ? '#f9fafb' : '#fff'};">
+        <td style="padding:11px 16px;font-size:13px;color:#6b7280;width:130px;">${label}</td>
+        <td style="padding:11px 16px;font-size:13px;color:#111827;">${value}</td>
+      </tr>`).join('')}
+    </table>
+    ${req.adminNote ? `
+    <div style="background:#f9fafb;border-left:3px solid ${BRAND_COLOR};padding:14px 16px;border-radius:0 8px 8px 0;margin-bottom:20px;">
+      <p style="margin:0 0 4px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;">Note</p>
+      <p style="margin:0;font-size:14px;color:#374151;">${req.adminNote}</p>
+    </div>` : ''}
+    <p style="margin:0;font-size:14px;color:#6b7280;">
+      If you have any questions, please contact us and we'll be happy to help.
+    </p>
+  `);
+
+  await resend.emails.send({
+    from: FROM,
+    to: req.guestEmail,
+    subject: `Refund Initiated — ${req.listingTitle}`,
+    html,
+  });
+}
+
+// ─── 5. Refund Request → Admin ────────────────────────────────────────────────
+
+export async function sendRefundRequestToAdmin(req: {
+  reservationId: string;
+  listingTitle: string;
+  startDate: Date | string;
+  endDate: Date | string;
+  reason?: string | null;
+  guestName?: string | null;
+  guestEmail?: string | null;
+}) {
+  if (!process.env.RESEND_API_KEY) return;
+
+  const html = baseLayout(`
+    <h2 style="margin:0 0 6px;font-size:22px;font-weight:800;color:#111827;">Refund Request Received</h2>
+    <p style="margin:0 0 20px;color:#6b7280;font-size:15px;">A guest has submitted a refund request for the following reservation.</p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin:0 0 20px;">
+      ${[
+        ['Property', req.listingTitle],
+        ['Check-in', formatDate(req.startDate)],
+        ['Check-out', formatDate(req.endDate)],
+        ['Guest', req.guestName || '—'],
+        ['Email', req.guestEmail || '—'],
+        ['Reason', req.reason || 'No reason provided'],
+        ['Reservation ID', `<span style="font-family:monospace;font-size:12px;">${req.reservationId.slice(0, 12).toUpperCase()}</span>`],
+      ].map(([label, value], i) => `
+      <tr style="background:${i % 2 === 0 ? '#f9fafb' : '#fff'};">
+        <td style="padding:11px 16px;font-size:13px;color:#6b7280;width:130px;">${label}</td>
+        <td style="padding:11px 16px;font-size:13px;color:#111827;">${value}</td>
+      </tr>`).join('')}
+    </table>
+    <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/admin/reservations"
+       style="display:inline-block;padding:12px 24px;background:${BRAND_COLOR};color:#fff;border-radius:8px;font-size:14px;font-weight:700;text-decoration:none;">
+      View Reservation →
+    </a>
+  `);
+
+  await resend.emails.send({
+    from: FROM,
+    to: ADMIN_EMAIL,
+    subject: `Refund Request — ${req.listingTitle}`,
+    html,
+  });
+}
+
+// ─── 6. Cancellation Decision → Guest ────────────────────────────────────────
 
 export async function sendCancellationDecisionToUser(req: {
   listingTitle: string;

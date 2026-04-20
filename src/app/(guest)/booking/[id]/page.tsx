@@ -50,6 +50,36 @@ const formatMoney = (value: number) => {
     return `$${value.toFixed(2)}`;
 };
 
+const COUNTRIES: { code: string; name: string }[] = [
+    { code: 'AF', name: 'Afghanistan' }, { code: 'AL', name: 'Albania' }, { code: 'DZ', name: 'Algeria' },
+    { code: 'AR', name: 'Argentina' }, { code: 'AU', name: 'Australia' }, { code: 'AT', name: 'Austria' },
+    { code: 'BH', name: 'Bahrain' }, { code: 'BD', name: 'Bangladesh' }, { code: 'BE', name: 'Belgium' },
+    { code: 'BR', name: 'Brazil' }, { code: 'BG', name: 'Bulgaria' }, { code: 'KH', name: 'Cambodia' },
+    { code: 'CA', name: 'Canada' }, { code: 'CL', name: 'Chile' }, { code: 'CN', name: 'China' },
+    { code: 'CO', name: 'Colombia' }, { code: 'HR', name: 'Croatia' }, { code: 'CZ', name: 'Czech Republic' },
+    { code: 'DK', name: 'Denmark' }, { code: 'EG', name: 'Egypt' }, { code: 'EE', name: 'Estonia' },
+    { code: 'ET', name: 'Ethiopia' }, { code: 'FI', name: 'Finland' }, { code: 'FR', name: 'France' },
+    { code: 'DE', name: 'Germany' }, { code: 'GH', name: 'Ghana' }, { code: 'GR', name: 'Greece' },
+    { code: 'HK', name: 'Hong Kong' }, { code: 'HU', name: 'Hungary' }, { code: 'IS', name: 'Iceland' },
+    { code: 'IN', name: 'India' }, { code: 'ID', name: 'Indonesia' }, { code: 'IE', name: 'Ireland' },
+    { code: 'IL', name: 'Israel' }, { code: 'IT', name: 'Italy' }, { code: 'JP', name: 'Japan' },
+    { code: 'JO', name: 'Jordan' }, { code: 'KE', name: 'Kenya' }, { code: 'KW', name: 'Kuwait' },
+    { code: 'LV', name: 'Latvia' }, { code: 'LB', name: 'Lebanon' }, { code: 'LT', name: 'Lithuania' },
+    { code: 'MY', name: 'Malaysia' }, { code: 'MV', name: 'Maldives' }, { code: 'MX', name: 'Mexico' },
+    { code: 'MA', name: 'Morocco' }, { code: 'NL', name: 'Netherlands' }, { code: 'NZ', name: 'New Zealand' },
+    { code: 'NG', name: 'Nigeria' }, { code: 'NO', name: 'Norway' }, { code: 'OM', name: 'Oman' },
+    { code: 'PK', name: 'Pakistan' }, { code: 'PE', name: 'Peru' }, { code: 'PH', name: 'Philippines' },
+    { code: 'PL', name: 'Poland' }, { code: 'PT', name: 'Portugal' }, { code: 'QA', name: 'Qatar' },
+    { code: 'RO', name: 'Romania' }, { code: 'RU', name: 'Russia' }, { code: 'SA', name: 'Saudi Arabia' },
+    { code: 'SG', name: 'Singapore' }, { code: 'ZA', name: 'South Africa' }, { code: 'KR', name: 'South Korea' },
+    { code: 'ES', name: 'Spain' }, { code: 'LK', name: 'Sri Lanka' }, { code: 'SE', name: 'Sweden' },
+    { code: 'CH', name: 'Switzerland' }, { code: 'TW', name: 'Taiwan' }, { code: 'TZ', name: 'Tanzania' },
+    { code: 'TH', name: 'Thailand' }, { code: 'TR', name: 'Turkey' }, { code: 'UG', name: 'Uganda' },
+    { code: 'UA', name: 'Ukraine' }, { code: 'AE', name: 'United Arab Emirates' },
+    { code: 'GB', name: 'United Kingdom' }, { code: 'US', name: 'United States' },
+    { code: 'UY', name: 'Uruguay' }, { code: 'VN', name: 'Vietnam' }, { code: 'ZW', name: 'Zimbabwe' },
+];
+
 export default function BookingConfirmPage() {
     const params = useParams();
     const id = params?.id as string;
@@ -69,7 +99,6 @@ export default function BookingConfirmPage() {
         primaryGuestName: '',
         primaryGuestEmail: '',
         primaryGuestPhone: '',
-        primaryGuestLocale: 'en',
         primaryGuestStreetAddress1: '',
         primaryGuestStreetAddress2: '',
         primaryGuestCity: '',
@@ -189,7 +218,6 @@ export default function BookingConfirmPage() {
         const nextErrors: Record<string, string> = {};
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         const phoneRegex = /^[+()\-\d\s]{7,}$/;
-        const countryCodeRegex = /^[A-Za-z]{2,3}$/;
 
         if (!guestDetails.primaryGuestName.trim()) {
             nextErrors.primaryGuestName = 'Guest name is required.';
@@ -204,14 +232,8 @@ export default function BookingConfirmPage() {
         } else if (!phoneRegex.test(guestDetails.primaryGuestPhone.trim())) {
             nextErrors.primaryGuestPhone = 'Enter a valid phone number.';
         }
-        if (!guestDetails.primaryGuestLocale.trim()) {
-            nextErrors.primaryGuestLocale = 'Locale is required.';
-        }
         if (!guestDetails.primaryGuestStreetAddress1.trim()) {
             nextErrors.primaryGuestStreetAddress1 = 'Address line 1 is required.';
-        }
-        if (!guestDetails.primaryGuestStreetAddress2.trim()) {
-            nextErrors.primaryGuestStreetAddress2 = 'Address line 2 is required.';
         }
         if (!guestDetails.primaryGuestCity.trim()) {
             nextErrors.primaryGuestCity = 'City is required.';
@@ -223,9 +245,7 @@ export default function BookingConfirmPage() {
             nextErrors.primaryGuestPostalCode = 'Postal code is required.';
         }
         if (!guestDetails.primaryGuestCountryCode.trim()) {
-            nextErrors.primaryGuestCountryCode = 'Country code is required.';
-        } else if (!countryCodeRegex.test(guestDetails.primaryGuestCountryCode.trim())) {
-            nextErrors.primaryGuestCountryCode = 'Use a 2-letter country code like IN or US.';
+            nextErrors.primaryGuestCountryCode = 'Country is required.';
         }
         if (!policiesAccepted) {
             nextErrors.policiesAccepted = 'Please accept the terms and policies to continue.';
@@ -352,17 +372,6 @@ export default function BookingConfirmPage() {
                                         />
                                         {fieldErrors.primaryGuestPhone && <p className="text-xs text-red-600">{fieldErrors.primaryGuestPhone}</p>}
                                     </label>
-                                    <label className="space-y-2">
-                                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Locale</span>
-                                        <input
-                                            value={guestDetails.primaryGuestLocale}
-                                            onChange={(e) => setGuestDetails((prev) => ({ ...prev, primaryGuestLocale: e.target.value }))}
-                                            className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-black placeholder:text-gray-400 outline-none focus:border-gray-900"
-                                            placeholder="en"
-                                            required
-                                        />
-                                        {fieldErrors.primaryGuestLocale && <p className="text-xs text-red-600">{fieldErrors.primaryGuestLocale}</p>}
-                                    </label>
                                     <label className="space-y-2 md:col-span-2">
                                         <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Address line 1</span>
                                         <input
@@ -375,15 +384,15 @@ export default function BookingConfirmPage() {
                                         {fieldErrors.primaryGuestStreetAddress1 && <p className="text-xs text-red-600">{fieldErrors.primaryGuestStreetAddress1}</p>}
                                     </label>
                                     <label className="space-y-2 md:col-span-2">
-                                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Address line 2</span>
+                                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                                            Address line 2 <span className="normal-case font-normal text-gray-400">(optional)</span>
+                                        </span>
                                         <input
                                             value={guestDetails.primaryGuestStreetAddress2}
                                             onChange={(e) => setGuestDetails((prev) => ({ ...prev, primaryGuestStreetAddress2: e.target.value }))}
                                             className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-black placeholder:text-gray-400 outline-none focus:border-gray-900"
-                                            placeholder="Apartment, suite, etc."
-                                            required
+                                            placeholder="Apartment, suite, unit, etc."
                                         />
-                                        {fieldErrors.primaryGuestStreetAddress2 && <p className="text-xs text-red-600">{fieldErrors.primaryGuestStreetAddress2}</p>}
                                     </label>
                                     <label className="space-y-2">
                                         <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">City</span>
@@ -419,14 +428,25 @@ export default function BookingConfirmPage() {
                                         {fieldErrors.primaryGuestPostalCode && <p className="text-xs text-red-600">{fieldErrors.primaryGuestPostalCode}</p>}
                                     </label>
                                     <label className="space-y-2">
-                                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Country code</span>
-                                        <input
-                                            value={guestDetails.primaryGuestCountryCode}
-                                            onChange={(e) => setGuestDetails((prev) => ({ ...prev, primaryGuestCountryCode: e.target.value }))}
-                                            className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-black placeholder:text-gray-400 outline-none focus:border-gray-900"
-                                            placeholder="IN"
-                                            required
-                                        />
+                                        <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Country</span>
+                                        <div className="relative">
+                                            <select
+                                                value={guestDetails.primaryGuestCountryCode}
+                                                onChange={(e) => setGuestDetails((prev) => ({ ...prev, primaryGuestCountryCode: e.target.value }))}
+                                                className="w-full appearance-none rounded-xl border border-gray-200 px-4 py-3 text-sm text-black bg-white outline-none focus:border-gray-900 cursor-pointer pr-10"
+                                                required
+                                            >
+                                                <option value="" disabled>Select country…</option>
+                                                {COUNTRIES.map((c) => (
+                                                    <option key={c.code} value={c.code}>{c.name}</option>
+                                                ))}
+                                            </select>
+                                            <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                                                <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                                                </svg>
+                                            </div>
+                                        </div>
                                         {fieldErrors.primaryGuestCountryCode && <p className="text-xs text-red-600">{fieldErrors.primaryGuestCountryCode}</p>}
                                     </label>
                                 </div>

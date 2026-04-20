@@ -10,7 +10,6 @@ import SleepingArrangements from '@/components/SleepingArrangements';
 import AboutSpace from '@/components/AboutSpace';
 import { ChevronLeft, ChevronRight, Star, X } from 'lucide-react';
 import Link from 'next/link';
-import ReviewForm from '@/components/ReviewForm';
 
 type Highlight = string | { title: string; description?: string };
 
@@ -85,10 +84,10 @@ type ListingDetail = {
 
 export default function ListingDetailClient({
   listing,
-  userId,
+  paymentPolicyContent,
 }: {
   listing: ListingDetail;
-  userId?: string;
+  paymentPolicyContent?: string;
 }) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -210,10 +209,6 @@ export default function ListingDetailClient({
         <SleepingArrangements bedrooms={listing.bedrooms} />
         <Reviews reviews={listing.reviews} totalRating={parseFloat(avgRating)} />
 
-        <ReviewForm
-          listingId={listing.id}
-          userId={userId}
-        />
 
         <LocationMap
           mapIframe={listing.mapIframe || undefined}
@@ -223,6 +218,7 @@ export default function ListingDetailClient({
         <ImportantThingsToKnow
           rules={listing.rules}
           cancellationPolicy={listing.cancellationPolicy}
+          paymentPolicyContent={paymentPolicyContent}
           checkInTime={listing.checkInTime}
           checkOutTime={listing.checkOutTime}
           maxGuests={listing.guestCount}

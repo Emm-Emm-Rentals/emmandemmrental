@@ -64,6 +64,9 @@ export default function AdminReservationsPage() {
     const [refundAmounts, setRefundAmounts] = useState<Record<string, string>>({});
     const [isRefunding, setIsRefunding] = useState<Record<string, boolean>>({});
     const [isSyncing, setIsSyncing] = useState<Record<string, boolean>>({});
+    const [isNotifying, setIsNotifying] = useState<Record<string, boolean>>({});
+    const [notifyNotes, setNotifyNotes] = useState<Record<string, string>>({});
+    const [notifySuccess, setNotifySuccess] = useState<Record<string, boolean>>({});
     const [expandedId, setExpandedId] = useState<string | null>(null);
 
     useEffect(() => {
@@ -102,6 +105,26 @@ export default function AdminReservationsPage() {
             alert(error.message || 'Lodgify sync failed');
         } finally {
             setIsSyncing((prev) => ({ ...prev, [reservationId]: false }));
+        }
+    };
+
+    const handleNotifyRefund = async (reservationId: string) => {
+        setIsNotifying((prev) => ({ ...prev, [reservationId]: true }));
+        setNotifySuccess((prev) => ({ ...prev, [reservationId]: false }));
+        try {
+            const response = await fetch(`/api/admin/reservations/${reservationId}/notify-refund`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ adminNote: notifyNotes[reservationId] || undefined }),
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Failed to send notification');
+            setNotifySuccess((prev) => ({ ...prev, [reservationId]: true }));
+            setNotifyNotes((prev) => ({ ...prev, [reservationId]: '' }));
+        } catch (error: any) {
+            alert(error.message || 'Failed to send refund notification');
+        } finally {
+            setIsNotifying((prev) => ({ ...prev, [reservationId]: false }));
         }
     };
 
@@ -397,35 +420,64 @@ export default function AdminReservationsPage() {
 
                                         {/* Refund controls */}
                                         {reservation.amountPaid > 0 && (
-                                            <div className="pt-3 border-t border-slate-200">
-                                                <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Issue refund</p>
-                                                <div className="flex items-center gap-2">
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        step="0.01"
-                                                        placeholder="Amount (USD)"
-                                                        value={refundAmounts[reservation.id] || ''}
-                                                        onChange={(e) => setRefundAmounts((prev) => ({ ...prev, [reservation.id]: e.target.value }))}
-                                                        className="w-36 h-9 px-3 text-xs border border-slate-200 rounded-lg bg-white focus:border-slate-900 outline-none"
-                                                    />
-                                                    <button
-                                                        onClick={() => {
-                                                            const value = refundAmounts[reservation.id];
-                                                            const amountCents = value ? Math.round(Number(value) * 100) : undefined;
-                                                            handleRefund(reservation.id, amountCents);
-                                                        }}
-                                                        disabled={isRefunding[reservation.id]}
-                                                        className="h-9 px-4 text-xs font-medium rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 text-slate-700"
-                                                    >
-                                                        {isRefunding[reservation.id] ? 'Refunding...' : 'Issue Refund'}
-                                                    </button>
-                                                    {reservation.refundStatus && reservation.refundStatus !== 'none' && (
-                                                        <span className="text-xs text-rose-500">
-                                                            {reservation.refundStatus} · {formatMoney(reservation.refundedAmount || 0, reservation.paymentCurrency)} refunded
-                                                        </span>
-                                                    )}
+                                            <div className="pt-3 border-t border-slate-200 space-y-4">
+                                                {/* Issue refund via Stripe */}
+                                                <div>
+                                                    <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Issue refund</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            step="0.01"
+                                                            placeholder="Amount (USD)"
+                                                            value={refundAmounts[reservation.id] || ''}
+                                                            onChange={(e) => setRefundAmounts((prev) => ({ ...prev, [reservation.id]: e.target.value }))}
+                                                            className="w-36 h-9 px-3 text-xs border border-slate-200 rounded-lg bg-white focus:border-slate-900 outline-none"
+                                                        />
+                                                        <button
+                                                            onClick={() => {
+                                                                const value = refundAmounts[reservation.id];
+                                                                const amountCents = value ? Math.round(Number(value) * 100) : undefined;
+                                                                handleRefund(reservation.id, amountCents);
+                                                            }}
+                                                            disabled={isRefunding[reservation.id]}
+                                                            className="h-9 px-4 text-xs font-medium rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 text-slate-700"
+                                                        >
+                                                            {isRefunding[reservation.id] ? 'Refunding...' : 'Issue Refund'}
+                                                        </button>
+                                                        {reservation.refundStatus && reservation.refundStatus !== 'none' && (
+                                                            <span className="text-xs text-rose-500">
+                                                                {reservation.refundStatus} · {formatMoney(reservation.refundedAmount || 0, reservation.paymentCurrency)} refunded
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
+
+                                                {/* Notify guest about refund (only if a refund has been issued) */}
+                                                {reservation.refundedAmount > 0 && (
+                                                    <div>
+                                                        <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Notify guest</p>
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Optional note to guest…"
+                                                                value={notifyNotes[reservation.id] || ''}
+                                                                onChange={(e) => setNotifyNotes((prev) => ({ ...prev, [reservation.id]: e.target.value }))}
+                                                                className="flex-1 min-w-0 h-9 px-3 text-xs border border-slate-200 rounded-lg bg-white focus:border-slate-900 outline-none"
+                                                            />
+                                                            <button
+                                                                onClick={() => handleNotifyRefund(reservation.id)}
+                                                                disabled={isNotifying[reservation.id]}
+                                                                className="h-9 px-4 text-xs font-semibold rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 whitespace-nowrap"
+                                                            >
+                                                                {isNotifying[reservation.id] ? 'Sending...' : 'Send Refund Email'}
+                                                            </button>
+                                                            {notifySuccess[reservation.id] && (
+                                                                <span className="text-xs text-green-600 font-medium">✓ Email sent</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                     </div>

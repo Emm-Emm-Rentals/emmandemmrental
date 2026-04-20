@@ -388,13 +388,14 @@ model TaxProfileLine {
 
 model Review {
   id        String   @id @default(cuid())
-  userId    String
+  userId    String?
   listingId String
   rating    Int
   comment   String
+  guestName String?
   createdAt DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
 }
 

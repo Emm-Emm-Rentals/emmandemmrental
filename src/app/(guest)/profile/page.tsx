@@ -18,6 +18,7 @@ export default async function ProfilePage() {
 
   return (
     <ProfileClient
+      userId={userId}
       user={{
         name: session?.user?.name,
         email: session?.user?.email,
@@ -28,12 +29,15 @@ export default async function ProfilePage() {
         .map((booking) => ({
         id: booking.id,
         source: booking.source,
+        listingId: booking.listingId,
         startDate: booking.startDate,
         endDate: booking.endDate,
         adults: booking.adults,
         children: booking.children,
         totalPrice: booking.totalPrice,
         currency: booking.currency,
+        hasReview: booking.hasReview,
+        reviewable: booking.reviewable,
         listing: {
           title: booking.listing.title,
           imageSrc: booking.listing.imageSrc,

@@ -51,8 +51,10 @@ function BookingDetailModal({
   onClose,
   onCancelRequest,
   onPayBalance,
+  onRefundRequest,
   isCancelling,
   isPayingBalance,
+  isRequestingRefund,
   cancelReason,
   setCancelReason,
 }: {
@@ -60,12 +62,16 @@ function BookingDetailModal({
   onClose: () => void;
   onCancelRequest: (booking: UpcomingBooking) => void;
   onPayBalance: (booking: UpcomingBooking) => void;
+  onRefundRequest: (booking: UpcomingBooking, reason: string) => void;
   isCancelling: boolean;
   isPayingBalance: boolean;
+  isRequestingRefund: boolean;
   cancelReason: string;
   setCancelReason: (v: string) => void;
 }) {
   const [showCancelForm, setShowCancelForm] = useState(false);
+  const [showRefundForm, setShowRefundForm] = useState(false);
+  const [refundReason, setRefundReason] = useState('');
   const blockMessage = getCancellationBlockMessage(booking);
   const isDeposit = booking.paymentType === 'deposit';
   const nights = booking.nights || Math.round(
@@ -210,7 +216,7 @@ function BookingDetailModal({
               </div>
             )}
 
-            {/* Cancel form (shown inline when user clicks Cancel) */}
+            {/* Cancel form */}
             {showCancelForm && (
               <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-4 space-y-3">
                 <p className="text-sm font-semibold text-rose-700">Request cancellation</p>
@@ -240,34 +246,77 @@ function BookingDetailModal({
                 </div>
               </div>
             )}
+
+            {/* Refund request form */}
+            {showRefundForm && (
+              <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-4 space-y-3">
+                <p className="text-sm font-semibold text-blue-800">Request a refund</p>
+                <p className="text-xs text-blue-600">Describe why you are requesting a refund. Our team will review and respond.</p>
+                <textarea
+                  rows={3}
+                  value={refundReason}
+                  onChange={(e) => setRefundReason(e.target.value)}
+                  placeholder="Reason for refund request (optional)…"
+                  className="w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:border-blue-400 focus:outline-none resize-none"
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setShowRefundForm(false); setRefundReason(''); }}
+                    className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                  >
+                    Go back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onRefundRequest(booking, refundReason)}
+                    disabled={isRequestingRefund}
+                    className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {isRequestingRefund ? 'Submitting…' : 'Submit Request'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Sticky action footer */}
-          {!showCancelForm && (
-            <div className="shrink-0 px-5 py-4 border-t border-gray-100 bg-white flex items-center gap-3">
-              {booking.source === 'local' && isDeposit && !booking.balancePaid && (
+          {!showCancelForm && !showRefundForm && (
+            <div className="shrink-0 px-5 py-4 border-t border-gray-100 bg-white flex flex-col gap-2">
+              <div className="flex items-center gap-3">
+                {booking.source === 'local' && isDeposit && !booking.balancePaid && (
+                  <button
+                    type="button"
+                    onClick={() => onPayBalance(booking)}
+                    disabled={isPayingBalance}
+                    className="flex-1 rounded-2xl bg-gray-900 py-3 text-sm font-semibold text-white hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isPayingBalance ? 'Redirecting…' : 'Pay Balance'}
+                  </button>
+                )}
+                {!blockMessage && !booking.hasPendingCancellation && (
+                  <button
+                    type="button"
+                    onClick={() => setShowCancelForm(true)}
+                    className="flex-1 rounded-2xl border border-rose-200 py-3 text-sm font-semibold text-rose-600 hover:bg-rose-50"
+                  >
+                    Cancel Reservation
+                  </button>
+                )}
+                {booking.hasPendingCancellation && (
+                  <div className="flex-1 rounded-2xl border border-orange-200 py-3 text-sm font-semibold text-orange-600 text-center bg-orange-50 cursor-default">
+                    Cancellation Pending
+                  </div>
+                )}
+              </div>
+              {booking.source === 'local' && (
                 <button
                   type="button"
-                  onClick={() => onPayBalance(booking)}
-                  disabled={isPayingBalance}
-                  className="flex-1 rounded-2xl bg-gray-900 py-3 text-sm font-semibold text-white hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => setShowRefundForm(true)}
+                  className="w-full rounded-2xl border border-blue-200 py-2.5 text-sm font-semibold text-blue-600 hover:bg-blue-50"
                 >
-                  {isPayingBalance ? 'Redirecting…' : 'Pay Balance'}
+                  Request Refund
                 </button>
-              )}
-              {!blockMessage && !booking.hasPendingCancellation && (
-                <button
-                  type="button"
-                  onClick={() => setShowCancelForm(true)}
-                  className="flex-1 rounded-2xl border border-rose-200 py-3 text-sm font-semibold text-rose-600 hover:bg-rose-50"
-                >
-                  Cancel Reservation
-                </button>
-              )}
-              {booking.hasPendingCancellation && (
-                <div className="flex-1 rounded-2xl border border-orange-200 py-3 text-sm font-semibold text-orange-600 text-center bg-orange-50 cursor-default">
-                  Cancellation Pending
-                </div>
               )}
             </div>
           )}
@@ -290,6 +339,7 @@ export default function UpcomingTripsClient({
   const [cancelReason, setCancelReason] = useState('');
   const [payingBalanceId, setPayingBalanceId] = useState<string | null>(null);
   const [selectedBooking, setSelectedBooking] = useState<UpcomingBooking | null>(null);
+  const [refundRequestId, setRefundRequestId] = useState<string | null>(null);
 
   const handlePayBalance = async (booking: UpcomingBooking) => {
     setPayingBalanceId(booking.id);
@@ -303,6 +353,25 @@ export default function UpcomingTripsClient({
     } catch (error: any) {
       showToast(error.message || 'Failed to start balance payment', 'error');
       setPayingBalanceId(null);
+    }
+  };
+
+  const handleRefundRequest = async (booking: UpcomingBooking, reason: string) => {
+    setRefundRequestId(booking.id);
+    try {
+      const response = await fetch(`/api/reservations/${booking.id}/refund-request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: reason.trim() || undefined }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to submit refund request');
+      showToast(data.message || 'Refund request submitted. An admin will review it shortly.', 'success');
+      setSelectedBooking(null);
+    } catch (error: any) {
+      showToast(error.message || 'Failed to submit refund request', 'error');
+    } finally {
+      setRefundRequestId(null);
     }
   };
 
@@ -422,8 +491,10 @@ export default function UpcomingTripsClient({
           onClose={() => { setSelectedBooking(null); setCancelReason(''); }}
           onCancelRequest={handleCancel}
           onPayBalance={handlePayBalance}
+          onRefundRequest={handleRefundRequest}
           isCancelling={activeCancellationId === selectedBooking.id}
           isPayingBalance={payingBalanceId === selectedBooking.id}
+          isRequestingRefund={refundRequestId === selectedBooking.id}
           cancelReason={cancelReason}
           setCancelReason={setCancelReason}
         />

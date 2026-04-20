@@ -1,8 +1,7 @@
 import { notFound } from 'next/navigation';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import ListingDetailClient from '@/components/pages/ListingDetailClient';
+import { DEFAULT_POLICY_BY_KEY, POLICY_KEYS } from '@/lib/policies';
 
 type Highlight = string | { title: string; description?: string };
 
@@ -54,49 +53,34 @@ export default async function PropertyPage({
 }) {
   const { id } = await params;
 
-  const listing = await withPrismaPoolRetry(() =>
-    prisma.listing.findUnique({
-      where: { id },
-      include: {
-        images: {
-          orderBy: { order: 'asc' },
-        },
-        advantages: {
-          orderBy: { order: 'asc' },
-        },
-        bedrooms: {
-          orderBy: { order: 'asc' },
-        },
-        reviews: {
-          include: {
-            user: {
-              select: {
-                name: true,
-                image: true,
-              },
-            },
+  const [listing, paymentPolicyDoc] = await Promise.all([
+    withPrismaPoolRetry(() =>
+      prisma.listing.findUnique({
+        where: { id },
+        include: {
+          images: { orderBy: { order: 'asc' } },
+          advantages: { orderBy: { order: 'asc' } },
+          bedrooms: { orderBy: { order: 'asc' } },
+          reviews: {
+            include: { user: { select: { name: true, image: true } } },
+            orderBy: { createdAt: 'desc' },
           },
-          orderBy: {
-            createdAt: 'desc',
-          },
+          taxProfile: { include: { lines: { orderBy: { order: 'asc' } } } },
         },
-        taxProfile: {
-          include: {
-            lines: {
-              orderBy: { order: 'asc' },
-            },
-          },
-        },
-      },
-    })
-  );
+      })
+    ),
+    prisma.policyDocument.findFirst({
+      where: { policyKey: POLICY_KEYS.PAYMENT_POLICY },
+      orderBy: { version: 'desc' },
+    }),
+  ]);
 
   if (!listing) {
     notFound();
   }
 
-  // Session is non-critical for rendering listing details.
-  const session = await getServerSession(authOptions);
+  const paymentPolicyContent =
+    paymentPolicyDoc?.content ?? DEFAULT_POLICY_BY_KEY[POLICY_KEYS.PAYMENT_POLICY].content;
 
   const serialized = {
     ...listing,
@@ -127,7 +111,7 @@ export default async function PropertyPage({
   return (
     <ListingDetailClient
       listing={serialized}
-      userId={(session?.user as { id?: string } | undefined)?.id}
+      paymentPolicyContent={paymentPolicyContent}
     />
   );
 }
