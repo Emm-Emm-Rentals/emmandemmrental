@@ -92,8 +92,8 @@ export default async function PropertyPage({
     reviews: listing.reviews.map((review) => ({
       ...review,
       user: {
-        name: review.user.name || 'Anonymous',
-        image: review.user.image,
+        name: review.user?.name || 'Anonymous',
+        image: review.user?.image ?? null,
       },
       createdAt: review.createdAt.toISOString(),
     })),
