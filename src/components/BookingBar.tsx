@@ -459,7 +459,7 @@ const BookingBar = ({
   };
 
   return (
-    <div className="fixed bottom-0 md:bottom-8 left-0 right-0 z-30 px-0 md:px-4 pointer-events-none flex justify-center">
+    <div className="fixed bottom-0 lg:bottom-8 left-0 right-0 z-30 px-0 lg:px-4 pointer-events-none flex justify-center">
       <div ref={containerRef} className="w-full max-w-[1050px] pointer-events-auto relative">
         <AnimatePresence>
           {/* Backdrop for mobile popups */}
@@ -470,7 +470,7 @@ const BookingBar = ({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setActivePopup(null)}
-              className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-[9999] md:hidden"
+              className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-[9999] lg:hidden"
             />
           )}
 
@@ -482,9 +482,9 @@ const BookingBar = ({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: "100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed md:absolute md:bottom-[calc(100%+20px)] bottom-0 left-0 right-0 md:left-1/2 md:-translate-x-1/2 bg-white md:rounded-[40px] rounded-t-[32px] md:rounded-b-[40px] shadow-[0_20px_60px_rgba(0,0,0,0.2)] border-x border-t md:border border-gray-100 p-6 md:p-8 w-full max-w-full md:max-w-[420px] md:w-[420px] z-[10000]"
+              className="fixed lg:absolute lg:bottom-[calc(100%+20px)] bottom-0 left-0 right-0 lg:left-1/2 lg:-translate-x-1/2 bg-white lg:rounded-[40px] rounded-t-[32px] lg:rounded-b-[40px] shadow-[0_20px_60px_rgba(0,0,0,0.2)] border-x border-t lg:border border-gray-100 p-6 lg:p-8 w-full max-w-full lg:max-w-[420px] lg:w-[420px] z-[10000]"
             >
-              <div className="flex justify-between items-center mb-6 md:mb-8 px-2">
+              <div className="flex justify-between items-center mb-6 lg:mb-8 px-2">
                 <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">
                   {calendarSelection === 'checkOut' ? 'Choose check-out date' : 'Choose check-in date'}
                 </span>
@@ -494,7 +494,7 @@ const BookingBar = ({
               </div>
 
               {/* Month Selector */}
-              <div className="flex justify-between items-center mb-6 md:mb-8 px-2">
+              <div className="flex justify-between items-center mb-6 lg:mb-8 px-2">
                 <button
                   onClick={() => setViewDate(subMonths(viewDate, 1))}
                   className="w-10 h-10 rounded-full border border-gray-200 hover:bg-gray-50 flex items-center justify-center"
@@ -502,7 +502,7 @@ const BookingBar = ({
                 >
                   <ChevronLeft size={22}  color='black'/>
                 </button>
-                <span className="text-lg md:text-xl font-bold text-gray-900">{format(viewDate, 'MMMM yyyy')}</span>
+                <span className="text-lg lg:text-xl font-bold text-gray-900">{format(viewDate, 'MMMM yyyy')}</span>
                 <button
                   onClick={() => setViewDate(addMonths(viewDate, 1))}
                   className="w-10 h-10 rounded-full border border-gray-200 hover:bg-gray-50 flex items-center justify-center"
@@ -531,7 +531,7 @@ const BookingBar = ({
               )}
 
               {/* THE GRID: Guaranteed 7 Columns */}
-              <div className="grid grid-cols-7 gap-y-1 md:gap-y-2 text-center text-[13px] md:text-sm">
+              <div className="grid grid-cols-7 gap-y-1 lg:gap-y-2 text-center text-[13px] lg:text-sm">
                 {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
                   <div key={d} className="text-[11px] font-bold text-gray-400 uppercase mb-4">{d}</div>
                 ))}
@@ -607,7 +607,7 @@ const BookingBar = ({
                             : undefined
                         }
                         className={`
-                          relative z-10 w-9 h-9 md:w-11 md:h-11 flex items-center justify-center font-bold rounded-full transition-all
+                          relative z-10 w-9 h-9 lg:w-11 lg:h-11 flex items-center justify-center font-bold rounded-full transition-all
                           ${!isCurrentMonth
                             ? 'text-transparent cursor-default'
                             : isPast
@@ -639,16 +639,16 @@ const BookingBar = ({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: "100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed md:absolute md:bottom-[calc(100%+20px)] bottom-0 left-0 right-0 md:left-auto md:right-0 w-full max-w-full md:max-w-[400px] bg-white md:rounded-[40px] rounded-t-[32px] md:rounded-b-[40px] shadow-[0_20px_60px_rgba(0,0,0,0.2)] border-x border-t md:border border-gray-100 p-6 md:p-10 z-[10000]"
+              className="fixed lg:absolute lg:bottom-[calc(100%+20px)] bottom-0 left-0 right-0 lg:left-auto lg:right-0 w-full max-w-full lg:max-w-[400px] bg-white lg:rounded-[40px] rounded-t-[32px] lg:rounded-b-[40px] shadow-[0_20px_60px_rgba(0,0,0,0.2)] border-x border-t lg:border border-gray-100 p-6 lg:p-10 z-[10000]"
             >
-              <div className="flex justify-between items-center mb-8 md:mb-10">
+              <div className="flex justify-between items-center mb-8 lg:mb-10">
                 <span className="text-sm text-gray-400 font-bold">Choose guest numbers (up to {safeMaxGuests})</span>
                 <button onClick={() => setActivePopup(null)} className="p-1 border-2 border-black rounded-lg"><X size={16} strokeWidth={3} color='black' /></button>
               </div>
               <div className="mb-6 text-xs font-semibold text-gray-500">
                 Maximum allowed guests: {safeMaxGuests}
               </div>
-              <div className="space-y-6 md:space-y-8">
+              <div className="space-y-6 lg:space-y-8">
                 <GuestRow
                   label="Adults"
                   sub="Age 13+"
@@ -675,8 +675,8 @@ const BookingBar = ({
         </AnimatePresence>
 
         {/* --- MAIN BAR --- */}
-        <div className={`bg-white md:rounded-full shadow-[0_12px_40px_rgba(0,0,0,0.12)] border-t md:border border-gray-100 p-2 md:pl-12 px-4 flex flex-col md:flex-row items-center justify-between h-auto md:h-[96px] w-full gap-2 md:gap-0 transition-all duration-300 ${isLoginModalOpen ? 'opacity-40 pointer-events-none filter grayscale-[0.5]' : 'opacity-100'}`}>
-          <div className="text-gray-900 font-bold text-base md:text-lg flex-1 md:block hidden">
+        <div className={`bg-white lg:rounded-full shadow-[0_12px_40px_rgba(0,0,0,0.12)] border-t lg:border border-gray-100 p-2 lg:pl-12 px-4 flex flex-col lg:flex-row items-center justify-between h-auto lg:h-[96px] w-full gap-2 lg:gap-0 transition-all duration-300 ${isLoginModalOpen ? 'opacity-40 pointer-events-none filter grayscale-[0.5]' : 'opacity-100'}`}>
+          <div className="text-gray-900 font-bold text-base lg:text-lg flex-1 lg:block hidden">
             {nightlyPrice ? (
               <div className="flex flex-col">
                 <span>{formatBookingMoney(nightlyPrice, isLodgifyMode ? lodgifyCurrency : null)} / night</span>
@@ -688,7 +688,7 @@ const BookingBar = ({
           </div>
 
           {/* Mobile Pricing View */}
-          <div className="flex md:hidden w-full items-center justify-between px-6 pt-2 pb-0.5">
+          <div className="flex lg:hidden w-full items-center justify-between px-6 pt-2 pb-0.5">
             <div className="flex flex-col">
               <span className="text-xs font-bold text-gray-900">
                 {nightlyPrice
@@ -704,33 +704,33 @@ const BookingBar = ({
             <button onClick={() => openCalendar('checkIn')} className="text-xs font-bold underline decoration-zinc-300 underline-offset-4">Change dates</button>
           </div>
 
-          <div className="flex flex-1 md:flex-none items-center py-2 w-[94%] md:w-auto h-14 md:h-full border border-gray-100 rounded-2xl md:rounded-[30px] bg-white overflow-hidden shadow-sm md:shadow-none">
-            <button onClick={() => openCalendar('checkIn')} className="flex flex-col flex-1 px-4 md:px-10 text-left hover:bg-gray-50 h-full justify-center border-r border-gray-100 min-w-0 md:min-w-[170px]">
-              <span className="text-[8px] md:text-[10px] uppercase font-extrabold text-gray-400 mb-0.5 md:mb-1">Check-In</span>
-              <span className="text-xs md:text-[15px] font-bold text-gray-900 tracking-tight whitespace-nowrap">
+          <div className="flex flex-1 lg:flex-none items-center py-2 w-[94%] lg:w-auto h-14 lg:h-full border border-gray-100 rounded-2xl lg:rounded-[30px] bg-white overflow-hidden shadow-sm lg:shadow-none">
+            <button onClick={() => openCalendar('checkIn')} className="flex flex-col flex-1 px-4 lg:px-10 text-left hover:bg-gray-50 h-full justify-center border-r border-gray-100 min-w-0 lg:min-w-[170px]">
+              <span className="text-[8px] lg:text-[10px] uppercase font-extrabold text-gray-400 mb-0.5 lg:mb-1">Check-In</span>
+              <span className="text-xs lg:text-[15px] font-bold text-gray-900 tracking-tight whitespace-nowrap">
                 {startDate ? format(startDate as Date, 'dd/MM/yy') : "Pick date"}
               </span>
             </button>
-            <button onClick={() => openCalendar('checkOut')} className="flex flex-col flex-1 px-4 md:px-10 text-left hover:bg-gray-50 h-full justify-center border-r border-gray-100 min-w-0 md:min-w-[170px]">
-              <span className="text-[8px] md:text-[10px] uppercase font-extrabold text-gray-400 mb-0.5 md:mb-1">Check-Out</span>
-              <span className="text-xs md:text-[15px] font-bold text-gray-900 tracking-tight whitespace-nowrap">
+            <button onClick={() => openCalendar('checkOut')} className="flex flex-col flex-1 px-4 lg:px-10 text-left hover:bg-gray-50 h-full justify-center border-r border-gray-100 min-w-0 lg:min-w-[170px]">
+              <span className="text-[8px] lg:text-[10px] uppercase font-extrabold text-gray-400 mb-0.5 lg:mb-1">Check-Out</span>
+              <span className="text-xs lg:text-[15px] font-bold text-gray-900 tracking-tight whitespace-nowrap">
                 {endDate ? format(endDate as Date, 'dd/MM/yy') : "Pick date"}
               </span>
             </button>
-            <button onClick={() => setActivePopup('guests')} className="flex items-center justify-between flex-1 md:flex-none px-4 md:px-10 text-left hover:bg-gray-50 h-full min-w-0 md:min-w-[220px]">
+            <button onClick={() => setActivePopup('guests')} className="flex items-center justify-between flex-1 lg:flex-none px-4 lg:px-10 text-left hover:bg-gray-50 h-full min-w-0 lg:min-w-[220px]">
               <div className="flex flex-col">
-                <span className="text-[8px] md:text-[10px] uppercase font-extrabold text-gray-400 mb-0.5 md:mb-1">Guests</span>
-                <span className="text-xs md:text-[15px] font-bold text-gray-900 tracking-tight">{totalGuests} guest{totalGuests !== 1 ? 's' : ''}</span>
+                <span className="text-[8px] lg:text-[10px] uppercase font-extrabold text-gray-400 mb-0.5 lg:mb-1">Guests</span>
+                <span className="text-xs lg:text-[15px] font-bold text-gray-900 tracking-tight">{totalGuests} guest{totalGuests !== 1 ? 's' : ''}</span>
               </div>
-              <ChevronDown size={14} className={`ml-2 md:ml-4 transition-transform ${activePopup === 'guests' ? 'rotate-180' : ''}`} />
+              <ChevronDown size={14} className={`ml-2 lg:ml-4 transition-transform ${activePopup === 'guests' ? 'rotate-180' : ''}`} />
             </button>
           </div>
 
-          <div className="w-[94%] md:w-auto md:ml-5 pb-2 md:pb-0">
+          <div className="w-[94%] lg:w-auto lg:ml-5 pb-2 lg:pb-0">
             <button
               onClick={handleReserve}
               disabled={!canReserve || isLodgifyChecking}
-              className={`bg-[#EE4B90] hover:bg-[#D63D76] text-white w-full md:w-auto px-10 md:px-14 py-3.5 md:h-[64px] rounded-2xl md:rounded-[30px] font-bold text-sm md:text-lg active:scale-[0.98] shadow-lg shadow-pink-100 flex items-center justify-center transition-all ${!canReserve ? 'opacity-50 cursor-not-allowed hover:bg-[#EE4B90]' : ''}`}
+              className={`bg-[#EE4B90] hover:bg-[#D63D76] text-white w-full lg:w-auto px-10 lg:px-14 py-3.5 lg:h-[64px] rounded-2xl lg:rounded-[30px] font-bold text-sm lg:text-lg active:scale-[0.98] shadow-lg shadow-pink-100 flex items-center justify-center transition-all ${!canReserve ? 'opacity-50 cursor-not-allowed hover:bg-[#EE4B90]' : ''}`}
             >
               {isLodgifyChecking
                 ? 'Checking...'
