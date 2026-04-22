@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { adminAuthOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { syncReservationToLodgify } from "@/lib/lodgify";
+import { logAdminAudit } from "@/lib/admin-audit";
 
 export async function POST(request: NextRequest) {
     try {
@@ -72,6 +73,12 @@ export async function POST(request: NextRequest) {
         });
 
         const updated = await prisma.reservation.findUnique({ where: { id: reservationId } });
+
+        const adminId = (session.user as any).id as string;
+        await logAdminAudit(adminId, 'reservation_sync_lodgify', reservationId, 'reservation', {
+            lodgifyReservationId: updated?.lodgifyReservationId,
+            syncStatus: updated?.lodgifySyncStatus,
+        });
 
         return NextResponse.json({ success: true, result, reservation: updated });
     } catch (error: any) {

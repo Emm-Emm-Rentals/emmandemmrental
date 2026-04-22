@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { adminAuthOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { DEFAULT_POLICY_BY_KEY, POLICY_KEYS, PolicyKey, formatPolicyContent } from '@/lib/policies';
+import { logAdminAudit } from '@/lib/admin-audit';
 
 const normalizePolicyKey = (value: unknown): PolicyKey | null => {
   if (typeof value !== 'string') return null;
@@ -85,6 +86,13 @@ export async function POST(request: NextRequest) {
         version: nextVersion,
         isActive: true,
       },
+    });
+
+    const adminId = (session.user as any).id as string;
+    await logAdminAudit(adminId, 'policy_update', policy.id, 'policy', {
+      policyKey,
+      version: nextVersion,
+      title,
     });
 
     return NextResponse.json({ policy }, { status: 201 });

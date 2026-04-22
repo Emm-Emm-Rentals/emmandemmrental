@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { TaxAppliesTo } from "@prisma/client";
 import { adminAuthOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { logAdminAudit } from "@/lib/admin-audit";
 
 const parseLines = (value: unknown) => {
   if (!Array.isArray(value)) return [];
@@ -88,6 +89,9 @@ export async function POST(request: NextRequest) {
         },
       },
     });
+
+    const adminId = (session.user as any).id as string;
+    await logAdminAudit(adminId, 'tax_profile_create', profile.id, 'tax_profile', { name: profile.name });
 
     return NextResponse.json(profile, { status: 201 });
   } catch (error) {

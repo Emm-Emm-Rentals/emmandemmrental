@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { adminAuthOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { stripe } from "@/lib/stripe";
+import { logAdminAudit } from "@/lib/admin-audit";
 
 export const runtime = "nodejs";
 
@@ -82,6 +83,13 @@ export async function POST(request: NextRequest) {
                     select: { id: true, name: true, email: true },
                 },
             },
+        });
+
+        const adminId = (session.user as any).id as string;
+        await logAdminAudit(adminId, 'refund_issue', reservationId, 'reservation', {
+            refundId: refund.id,
+            amountCents: refundAmount,
+            currency: refund.currency,
         });
 
         return NextResponse.json({ reservation: updated, refund });

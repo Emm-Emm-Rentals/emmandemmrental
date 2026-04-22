@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { adminAuthOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sendRefundInitiatedToUser } from "@/lib/email";
+import { logAdminAudit } from "@/lib/admin-audit";
 
 export async function POST(
     request: NextRequest,
@@ -52,6 +53,12 @@ export async function POST(
             adminNote: adminNote || null,
             guestName: reservation.user?.name || reservation.primaryGuestName || null,
             guestEmail,
+        });
+
+        const adminId = (session.user as any).id as string;
+        await logAdminAudit(adminId, 'refund_notify', id, 'reservation', {
+            guestEmail,
+            refundedAmount: reservation.refundedAmount,
         });
 
         return NextResponse.json({ success: true });

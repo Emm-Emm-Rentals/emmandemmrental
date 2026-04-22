@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { adminAuthOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { logAdminAudit } from "@/lib/admin-audit";
 
 export async function DELETE(
     request: NextRequest,
@@ -23,10 +24,15 @@ export async function DELETE(
             );
         }
 
+        const listing = await prisma.listing.findUnique({ where: { id }, select: { title: true } });
+
         // Delete the listing (images will cascade delete)
         await prisma.listing.delete({
             where: { id },
         });
+
+        const adminId = (session.user as any).id as string;
+        await logAdminAudit(adminId, 'listing_delete', id, 'listing', { title: listing?.title });
 
         return NextResponse.json(
             { message: "Listing deleted successfully" },

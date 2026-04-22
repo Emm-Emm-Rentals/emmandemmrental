@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { TaxAppliesTo } from "@prisma/client";
 import { adminAuthOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { logAdminAudit } from "@/lib/admin-audit";
 
 const parseLines = (value: unknown) => {
   if (!Array.isArray(value)) return [];
@@ -67,6 +68,9 @@ export async function PUT(
       },
     });
 
+    const adminId = (session.user as any).id as string;
+    await logAdminAudit(adminId, 'tax_profile_update', id, 'tax_profile', { name: profile.name });
+
     return NextResponse.json(profile);
   } catch (error) {
     console.error("Update tax profile error:", error);
@@ -75,7 +79,7 @@ export async function PUT(
 }
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -91,6 +95,9 @@ export async function DELETE(
       data: { taxProfileId: null },
     });
     await prisma.taxProfile.delete({ where: { id } });
+
+    const adminId = (session.user as any).id as string;
+    await logAdminAudit(adminId, 'tax_profile_delete', id, 'tax_profile');
 
     return NextResponse.json({ success: true });
   } catch (error) {

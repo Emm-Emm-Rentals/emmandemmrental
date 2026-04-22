@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { adminAuthOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { logAdminAudit } from "@/lib/admin-audit";
 
 async function requireAdmin() {
     const session = await getServerSession(adminAuthOptions);
@@ -41,7 +42,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-    if (!(await requireAdmin())) {
+    const session = await requireAdmin();
+    if (!session) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -76,6 +78,13 @@ export async function POST(request: NextRequest) {
             },
         });
 
+        const adminId = (session.user as any).id as string;
+        await logAdminAudit(adminId, 'review_create', review.id, 'review', {
+            listingId,
+            rating,
+            guestName: guestName.trim(),
+        });
+
         return NextResponse.json(review, { status: 201 });
     } catch (error) {
         console.error("Admin reviews POST error:", error);
@@ -84,7 +93,8 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-    if (!(await requireAdmin())) {
+    const session = await requireAdmin();
+    if (!session) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -93,6 +103,10 @@ export async function DELETE(request: NextRequest) {
         if (!id) return NextResponse.json({ error: "Review id required" }, { status: 400 });
 
         await prisma.review.delete({ where: { id } });
+
+        const adminId = (session.user as any).id as string;
+        await logAdminAudit(adminId, 'review_delete', id, 'review');
+
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error("Admin reviews DELETE error:", error);

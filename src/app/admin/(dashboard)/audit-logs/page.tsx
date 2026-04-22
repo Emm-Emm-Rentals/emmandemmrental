@@ -2,6 +2,16 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
+const TARGET_TYPE_COLORS: Record<string, string> = {
+    user: 'bg-blue-50 text-blue-700',
+    listing: 'bg-violet-50 text-violet-700',
+    reservation: 'bg-amber-50 text-amber-700',
+    cancellation_request: 'bg-red-50 text-red-700',
+    review: 'bg-green-50 text-green-700',
+    policy: 'bg-slate-100 text-slate-600',
+    tax_profile: 'bg-orange-50 text-orange-700',
+};
+
 const formatDateTime = (value: string) =>
     new Date(value).toLocaleString('en-US', { month: 'short', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
@@ -74,14 +84,37 @@ export default function AdminAuditLogsPage() {
                         onChange={(e) => setFilters((prev) => ({ ...prev, action: e.target.value }))}
                         className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 focus:bg-white focus:border-slate-900 outline-none"
                     >
-                        <option value="">Action</option>
-                        <option value="set_role">set_role</option>
-                        <option value="deactivate">deactivate</option>
-                        <option value="reactivate">reactivate</option>
-                        <option value="soft_delete">soft_delete</option>
-                        <option value="hard_delete">hard_delete</option>
-                        <option value="revoke_sessions">revoke_sessions</option>
-                        <option value="reset_password">reset_password</option>
+                        <option value="">All Actions</option>
+                        <optgroup label="User">
+                            <option value="set_role">set_role</option>
+                            <option value="deactivate">deactivate</option>
+                            <option value="reactivate">reactivate</option>
+                            <option value="soft_delete">soft_delete</option>
+                            <option value="hard_delete">hard_delete</option>
+                            <option value="revoke_sessions">revoke_sessions</option>
+                            <option value="reset_password">reset_password</option>
+                        </optgroup>
+                        <optgroup label="Listing">
+                            <option value="listing_create">listing_create</option>
+                            <option value="listing_update">listing_update</option>
+                            <option value="listing_delete">listing_delete</option>
+                            <option value="listing_reorder">listing_reorder</option>
+                        </optgroup>
+                        <optgroup label="Reservation">
+                            <option value="cancellation_approve">cancellation_approve</option>
+                            <option value="cancellation_reject">cancellation_reject</option>
+                            <option value="refund_issue">refund_issue</option>
+                            <option value="refund_notify">refund_notify</option>
+                            <option value="reservation_sync_lodgify">reservation_sync_lodgify</option>
+                        </optgroup>
+                        <optgroup label="Content">
+                            <option value="review_create">review_create</option>
+                            <option value="review_delete">review_delete</option>
+                            <option value="policy_update">policy_update</option>
+                            <option value="tax_profile_create">tax_profile_create</option>
+                            <option value="tax_profile_update">tax_profile_update</option>
+                            <option value="tax_profile_delete">tax_profile_delete</option>
+                        </optgroup>
                     </select>
                     <input
                         type="date"
@@ -119,7 +152,11 @@ export default function AdminAuditLogsPage() {
                                 </div>
                                 <div className="col-span-3 text-sm text-slate-700">
                                     <p className="font-medium text-slate-900">{log.action}</p>
-                                    <p className="text-xs text-slate-500">{log.targetType || 'user'}</p>
+                                    {log.targetType && (
+                                        <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${TARGET_TYPE_COLORS[log.targetType] || 'bg-slate-100 text-slate-500'}`}>
+                                            {log.targetType}
+                                        </span>
+                                    )}
                                 </div>
                                 <div className="col-span-3 text-xs text-slate-600">
                                     {log.targetUser ? (

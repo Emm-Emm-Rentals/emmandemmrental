@@ -4,6 +4,7 @@ import { adminAuthOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { cancelLodgifyReservationById } from "@/lib/lodgify";
 import { sendCancellationDecisionToUser } from "@/lib/email";
+import { logAdminAudit } from "@/lib/admin-audit";
 
 export async function PATCH(
     request: NextRequest,
@@ -124,6 +125,12 @@ export async function PATCH(
                 requestId: id,
             });
         }
+
+        const adminId = (session.user as any).id as string;
+        await logAdminAudit(adminId, `cancellation_${action}`, id, 'cancellation_request', {
+            reservationId: cancellationRequest.reservation?.id,
+            adminNote: adminNote || null,
+        });
 
         return NextResponse.json({ success: true, request: updated });
     } catch (error: any) {

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { adminAuthOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { normalizeDynamicPricingRules } from "@/lib/pricing";
+import { logAdminAudit } from "@/lib/admin-audit";
 
 // Create or update listing
 export async function POST(request: NextRequest) {
@@ -305,6 +306,9 @@ export async function POST(request: NextRequest) {
                 }
             }
 
+            const adminId = (session.user as any).id as string;
+            await logAdminAudit(adminId, 'listing_update', id, 'listing', { title });
+
             // Refetch with all relationships
             return NextResponse.json(
                 await prisma.listing.findUnique({
@@ -474,6 +478,8 @@ export async function POST(request: NextRequest) {
                     },
                 },
             });
+
+            await logAdminAudit(currentUserId, 'listing_create', listing.id, 'listing', { title: listing.title });
 
             return NextResponse.json(listing, { status: 201 });
         }

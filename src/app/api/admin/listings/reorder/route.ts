@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { adminAuthOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { logAdminAudit } from "@/lib/admin-audit";
 
 export async function POST(request: NextRequest) {
     const session = await getServerSession(adminAuthOptions);
@@ -39,6 +40,9 @@ export async function POST(request: NextRequest) {
                 })
             )
         );
+
+        const adminId = (session.user as any).id as string;
+        await logAdminAudit(adminId, 'listing_reorder', 'bulk', 'listing', { count: orderedIds.length });
 
         return NextResponse.json({ success: true });
     } catch (error) {
