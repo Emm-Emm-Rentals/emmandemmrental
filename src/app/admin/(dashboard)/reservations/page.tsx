@@ -53,6 +53,13 @@ function InfoRow({ label, value }: { label: string; value?: string | null }) {
     );
 }
 
+type ConfirmModal = {
+    reservationId: string;
+    action: 'cancel' | 'delete';
+    listingTitle: string;
+    isLodgify: boolean;
+};
+
 export default function AdminReservationsPage() {
     const [reservations, setReservations] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -68,6 +75,9 @@ export default function AdminReservationsPage() {
     const [notifyNotes, setNotifyNotes] = useState<Record<string, string>>({});
     const [notifySuccess, setNotifySuccess] = useState<Record<string, boolean>>({});
     const [expandedId, setExpandedId] = useState<string | null>(null);
+    const [confirmModal, setConfirmModal] = useState<ConfirmModal | null>(null);
+    const [isActioning, setIsActioning] = useState(false);
+    const [actionError, setActionError] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchReservations = async () => {
@@ -125,6 +135,32 @@ export default function AdminReservationsPage() {
             alert(error.message || 'Failed to send refund notification');
         } finally {
             setIsNotifying((prev) => ({ ...prev, [reservationId]: false }));
+        }
+    };
+
+    const handleConfirmAction = async () => {
+        if (!confirmModal) return;
+        setIsActioning(true);
+        setActionError(null);
+        const { reservationId, action } = confirmModal;
+        try {
+            const response = await fetch(`/api/admin/reservations/${reservationId}`, {
+                method: action === 'cancel' ? 'PATCH' : 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || `Failed to ${action} reservation`);
+            if (action === 'cancel') {
+                setReservations((prev) => prev.map((r) => (r.id === reservationId ? { ...r, ...data.reservation } : r)));
+            } else {
+                setReservations((prev) => prev.filter((r) => r.id !== reservationId));
+                setTotal((t) => t - 1);
+            }
+            setConfirmModal(null);
+        } catch (err: any) {
+            setActionError(err.message || `Failed to ${action} reservation`);
+        } finally {
+            setIsActioning(false);
         }
     };
 
@@ -418,6 +454,32 @@ export default function AdminReservationsPage() {
                                             </div>
                                         </div>
 
+                                        {/* Cancel / Delete — available for all reservations */}
+                                        <div className="pt-3 border-t border-slate-200">
+                                            <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Admin actions</p>
+                                            {reservation.listing?.lodgifyPropertyId && (
+                                                <p className="text-[11px] text-slate-500 mb-2">
+                                                    This is a Lodgify property — cancelling or deleting will also update the Lodgify calendar.
+                                                </p>
+                                            )}
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                {reservation.paymentStatus !== 'cancelled' && (
+                                                    <button
+                                                        onClick={() => setConfirmModal({ reservationId: reservation.id, action: 'cancel', listingTitle: reservation.listing?.title || reservation.id, isLodgify: Boolean(reservation.listing?.lodgifyPropertyId) })}
+                                                        className="h-8 px-4 text-xs font-semibold rounded-lg border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
+                                                    >
+                                                        Cancel Reservation
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={() => setConfirmModal({ reservationId: reservation.id, action: 'delete', listingTitle: reservation.listing?.title || reservation.id, isLodgify: Boolean(reservation.listing?.lodgifyPropertyId) })}
+                                                    className="h-8 px-4 text-xs font-semibold rounded-lg border border-red-300 bg-red-50 text-red-700 hover:bg-red-100"
+                                                >
+                                                    Delete Reservation
+                                                </button>
+                                            </div>
+                                        </div>
+
                                         {/* Refund controls */}
                                         {reservation.amountPaid > 0 && (
                                             <div className="pt-3 border-t border-slate-200 space-y-4">
@@ -506,6 +568,67 @@ export default function AdminReservationsPage() {
                         >
                             Next
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Confirmation modal */}
+            {confirmModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl p-6 space-y-4">
+                        <div className="flex items-start gap-3">
+                            <div className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${confirmModal.action === 'delete' ? 'bg-red-100' : 'bg-amber-100'}`}>
+                                <span className={`text-lg ${confirmModal.action === 'delete' ? 'text-red-600' : 'text-amber-600'}`}>
+                                    {confirmModal.action === 'delete' ? '🗑' : '⚠️'}
+                                </span>
+                            </div>
+                            <div>
+                                <h2 className="text-base font-semibold text-slate-900 capitalize">
+                                    {confirmModal.action} reservation?
+                                </h2>
+                                <p className="mt-1 text-sm text-slate-500">
+                                    {confirmModal.action === 'delete'
+                                        ? <>This will <span className="font-semibold text-red-600">permanently delete</span> the reservation for <span className="font-medium text-slate-800">{confirmModal.listingTitle}</span>. This cannot be undone.</>
+                                        : <>This will mark the reservation for <span className="font-medium text-slate-800">{confirmModal.listingTitle}</span> as <span className="font-semibold text-amber-700">cancelled</span>. The record will be kept.</>
+                                    }
+                                </p>
+                                {confirmModal.isLodgify && (
+                                    <p className="mt-2 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                                        Lodgify property — this will also {confirmModal.action === 'delete' ? 'decline the booking and free the dates' : 'decline the booking'} on the Lodgify calendar.
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+
+                        {actionError && (
+                            <p className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs font-medium text-red-700">
+                                {actionError}
+                            </p>
+                        )}
+
+                        <div className="flex justify-end gap-2 pt-2">
+                            <button
+                                onClick={() => { setConfirmModal(null); setActionError(null); }}
+                                disabled={isActioning}
+                                className="px-4 py-2 text-sm font-medium rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-50"
+                            >
+                                Keep it
+                            </button>
+                            <button
+                                onClick={handleConfirmAction}
+                                disabled={isActioning}
+                                className={`px-4 py-2 text-sm font-semibold rounded-lg text-white disabled:opacity-50 ${
+                                    confirmModal.action === 'delete'
+                                        ? 'bg-red-600 hover:bg-red-700'
+                                        : 'bg-amber-600 hover:bg-amber-700'
+                                }`}
+                            >
+                                {isActioning
+                                    ? (confirmModal.action === 'delete' ? 'Deleting…' : 'Cancelling…')
+                                    : (confirmModal.action === 'delete' ? 'Yes, delete' : 'Yes, cancel')
+                                }
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

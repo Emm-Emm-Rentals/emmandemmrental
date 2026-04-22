@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
                     select: { id: true, name: true, email: true },
                 },
                 listing: {
-                    select: { id: true, title: true, subtitle: true, imageSrc: true, locationValue: true },
+                    select: { id: true, title: true, subtitle: true, imageSrc: true, locationValue: true, lodgifyPropertyId: true },
                 },
             },
             orderBy: { createdAt: "desc" },

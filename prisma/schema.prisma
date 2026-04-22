@@ -46,6 +46,7 @@ model User {
   reviews       Review[]
   adminAuditLogs AdminAuditLog[] @relation("AdminAuditLogs")
   cancellationRequests CancellationRequest[]
+  refundRequests RefundRequest[]
 }
 
 model AdminAuditLog {
@@ -337,6 +338,7 @@ model Reservation {
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   listing    Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
   cancellationRequests CancellationRequest[]
+  refundRequests RefundRequest[]
 }
 
 model TaxProfile {
@@ -418,4 +420,22 @@ model CancellationRequest {
 
   reservation          Reservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
   user                 User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model RefundRequest {
+  id            String    @id @default(cuid())
+  reservationId String?
+  userId        String
+  listingTitle  String
+  startDate     DateTime
+  endDate       DateTime
+  reason        String?   @db.Text
+  // "pending" | "approved" | "rejected"
+  status        String    @default("pending")
+  adminNote     String?   @db.Text
+  createdAt     DateTime  @default(now())
+  processedAt   DateTime?
+
+  reservation   Reservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

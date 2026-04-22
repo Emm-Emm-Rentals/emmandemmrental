@@ -10,6 +10,7 @@ const TARGET_TYPE_COLORS: Record<string, string> = {
     review: 'bg-green-50 text-green-700',
     policy: 'bg-slate-100 text-slate-600',
     tax_profile: 'bg-orange-50 text-orange-700',
+    refund_request: 'bg-sky-50 text-sky-700',
 };
 
 const formatDateTime = (value: string) =>
@@ -103,9 +104,15 @@ export default function AdminAuditLogsPage() {
                         <optgroup label="Reservation">
                             <option value="cancellation_approve">cancellation_approve</option>
                             <option value="cancellation_reject">cancellation_reject</option>
+                            <option value="reservation_cancel">reservation_cancel</option>
+                            <option value="reservation_delete">reservation_delete</option>
                             <option value="refund_issue">refund_issue</option>
                             <option value="refund_notify">refund_notify</option>
                             <option value="reservation_sync_lodgify">reservation_sync_lodgify</option>
+                        </optgroup>
+                        <optgroup label="Refund Requests">
+                            <option value="refund_request_approve">refund_request_approve</option>
+                            <option value="refund_request_reject">refund_request_reject</option>
                         </optgroup>
                         <optgroup label="Content">
                             <option value="review_create">review_create</option>

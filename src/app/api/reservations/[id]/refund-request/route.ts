@@ -40,6 +40,28 @@ export async function POST(
             return NextResponse.json({ error: "No payment found for this reservation" }, { status: 400 });
         }
 
+        // Check for an existing pending refund request to avoid duplicates
+        const existing = await prisma.refundRequest.findFirst({
+            where: { reservationId: id, status: "pending" },
+        });
+        if (existing) {
+            return NextResponse.json({ error: "A refund request is already pending for this reservation" }, { status: 409 });
+        }
+
+        const listingTitle = reservation.listing?.title || "Unknown Listing";
+
+        await prisma.refundRequest.create({
+            data: {
+                reservationId: id,
+                userId,
+                listingTitle,
+                startDate: reservation.startDate,
+                endDate: reservation.endDate,
+                reason: reason ?? null,
+                status: "pending",
+            },
+        });
+
         const guestEmail =
             reservation.user?.email ||
             reservation.primaryGuestEmail ||
@@ -47,7 +69,7 @@ export async function POST(
 
         sendRefundRequestToAdmin({
             reservationId: reservation.id,
-            listingTitle: reservation.listing?.title || "Unknown Listing",
+            listingTitle,
             startDate: reservation.startDate,
             endDate: reservation.endDate,
             reason,

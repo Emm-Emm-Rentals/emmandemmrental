@@ -16,7 +16,8 @@ import {
     Menu,
     X,
     CircleOff,
-    Star
+    Star,
+    RotateCcw
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -33,6 +34,7 @@ const Sidebar = () => {
         { label: 'Policies', href: '/admin/policies', icon: <FileText size={20} /> },
         { label: 'Tax Profiles', href: '/admin/tax-profiles', icon: <Receipt size={20} /> },
         { label: 'Cancellations', href: '/admin/cancellation-requests', icon: <CircleOff size={20} /> },
+        { label: 'Refund Requests', href: '/admin/refund-requests', icon: <RotateCcw size={20} /> },
         { label: 'Reviews', href: '/admin/reviews', icon: <Star size={20} /> },
         { label: 'Audit Logs', href: '/admin/audit-logs', icon: <ScrollText size={20} /> },
     ];
