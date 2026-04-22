@@ -182,11 +182,13 @@ const BookingBar = ({
     lodgifyPropertyId ||
     (lodgifyBookingUrl || lodgifyWidgetEmbed ? HARDCODED_LODGIFY_PROPERTY_ID : null);
   const isLodgifyMode = Boolean(effectiveLodgifyPropertyId);
+  // DB availability mode: no Lodgify property ID but we have a listingId
+  const isDbAvailabilityMode = !isLodgifyMode && Boolean(listingId);
 
   // First unavailable date strictly after check-in — checkout can land ON it (guest leaves that day)
   // but the range cannot extend past it.
   const maxCheckoutDate = useMemo(() => {
-    if (!startDate || !isLodgifyMode || unavailableDates.size === 0) return null;
+    if (!startDate || unavailableDates.size === 0) return null;
     let cursor = addDays(startDate, 1);
     const limit = addDays(startDate, 730);
     while (isBefore(cursor, limit)) {
@@ -194,7 +196,7 @@ const BookingBar = ({
       cursor = addDays(cursor, 1);
     }
     return null;
-  }, [startDate, unavailableDates, isLodgifyMode]);
+  }, [startDate, unavailableDates]);
 
   useEffect(() => {
     console.log('[booking-bar] mode', {
@@ -334,7 +336,7 @@ const BookingBar = ({
   }, [pricingPreview]);
 
   useEffect(() => {
-    if (!isLodgifyMode || !effectiveLodgifyPropertyId) {
+    if (!isLodgifyMode && !isDbAvailabilityMode) {
       setUnavailableDates(new Set());
       return;
     }
@@ -344,29 +346,48 @@ const BookingBar = ({
     const visibleEnd = endOfWeek(endOfMonth(viewDate));
 
     const fetchMonthAvailability = async () => {
-      console.log('[booking-bar] month preload availability', {
-        propertyId: effectiveLodgifyPropertyId,
-        viewMonth: format(viewDate, 'yyyy-MM'),
-        visibleStart: format(visibleStart, 'yyyy-MM-dd'),
-        visibleEnd: format(visibleEnd, 'yyyy-MM-dd'),
-      });
       setIsCalendarAvailabilityLoading(true);
       try {
-        const params = new URLSearchParams({
-          propertyId: effectiveLodgifyPropertyId,
-          startDate: format(visibleStart, 'yyyy-MM-dd'),
-          endDate: format(visibleEnd, 'yyyy-MM-dd'),
-        });
-        const response = await fetch(`/api/lodgify/availability?${params.toString()}`);
-        const payload = await response.json();
-        if (!response.ok) {
-          throw new Error(payload.error || 'Failed to load Lodgify availability');
+        let blockedDates: Set<string>;
+
+        if (isLodgifyMode && effectiveLodgifyPropertyId) {
+          console.log('[booking-bar] month preload availability (lodgify)', {
+            propertyId: effectiveLodgifyPropertyId,
+            viewMonth: format(viewDate, 'yyyy-MM'),
+          });
+          const params = new URLSearchParams({
+            propertyId: effectiveLodgifyPropertyId,
+            startDate: format(visibleStart, 'yyyy-MM-dd'),
+            endDate: format(visibleEnd, 'yyyy-MM-dd'),
+          });
+          const response = await fetch(`/api/lodgify/availability?${params.toString()}`);
+          const payload = await response.json();
+          if (!response.ok) {
+            throw new Error(payload.error || 'Failed to load Lodgify availability');
+          }
+          blockedDates = extractUnavailableDates(payload);
+        } else {
+          // DB availability mode — fetch blocked dates from our own reservations
+          console.log('[booking-bar] month preload availability (db)', {
+            listingId,
+            viewMonth: format(viewDate, 'yyyy-MM'),
+          });
+          const params = new URLSearchParams({
+            listingId: listingId!,
+            startDate: format(visibleStart, 'yyyy-MM-dd'),
+            endDate: format(visibleEnd, 'yyyy-MM-dd'),
+          });
+          const response = await fetch(`/api/availability?${params.toString()}`);
+          const payload = await response.json();
+          if (!response.ok) {
+            throw new Error(payload.error || 'Failed to load availability');
+          }
+          blockedDates = new Set<string>(Array.isArray(payload.blockedDates) ? payload.blockedDates : []);
         }
 
         if (!isCancelled) {
-          const blockedDates = extractUnavailableDates(payload);
           console.log('[booking-bar] unavailable dates loaded', {
-            propertyId: effectiveLodgifyPropertyId,
+            listingId,
             viewMonth: format(viewDate, 'yyyy-MM'),
             count: blockedDates.size,
             sample: Array.from(blockedDates).slice(0, 10),
@@ -375,7 +396,7 @@ const BookingBar = ({
         }
       } catch (error) {
         if (!isCancelled) {
-          console.error('[booking-bar] failed to preload Lodgify availability', error);
+          console.error('[booking-bar] failed to preload availability', error);
           setUnavailableDates(new Set());
         }
       } finally {
@@ -390,7 +411,7 @@ const BookingBar = ({
     return () => {
       isCancelled = true;
     };
-  }, [effectiveLodgifyPropertyId, isLodgifyMode, viewDate]);
+  }, [effectiveLodgifyPropertyId, isLodgifyMode, isDbAvailabilityMode, listingId, viewDate]);
 
   const handleReserve = async () => {
     if (!session) {
@@ -518,11 +539,6 @@ const BookingBar = ({
                 </div>
               )}
 
-              {isLodgifyMode && isCalendarAvailabilityLoading && (
-                <div className="px-2 mb-4 text-xs font-semibold text-gray-500">
-                  Loading Lodgify availability...
-                </div>
-              )}
 
               {dateError && (
                 <div className="px-2 mb-4 text-xs font-semibold text-rose-600">
@@ -542,7 +558,7 @@ const BookingBar = ({
                   const isEnd = endDate && isSameDay(day, endDate);
                   const isRange = startDate && endDate && isWithinInterval(day, { start: startDate, end: endDate });
                   const isPast = isBefore(day, startOfDay(new Date()));
-                  const isUnavailable = isLodgifyMode && unavailableDates.has(format(day, 'yyyy-MM-dd'));
+                  const isUnavailable = unavailableDates.has(format(day, 'yyyy-MM-dd'));
 
                   // While picking checkout: highlight hover range between startDate and hoverDate
                   const isHoverRange =
@@ -585,45 +601,51 @@ const BookingBar = ({
                   // Show confirmed range OR hover preview range background
                   const showRangeBg = (isRange && !isStart && !isEnd) || isHoverRange;
 
+                  const showShimmer = isCalendarAvailabilityLoading && isCurrentMonth && !isPast;
+
                   return (
                     <div key={i} className="relative py-1 flex justify-center items-center">
-                      {showRangeBg && (
+                      {showRangeBg && !showShimmer && (
                         <div className="absolute inset-y-1 left-0 right-0 bg-gray-100" />
                       )}
-                      <button
-                        onClick={() => handleDateClick(day)}
-                        onMouseEnter={() => {
-                          if (calendarSelection === 'checkOut' && startDate && !endDate && !isDisabled) {
-                            setHoverDate(day);
+                      {showShimmer ? (
+                        <div className="w-9 h-9 lg:w-11 lg:h-11 rounded-full bg-gray-200 animate-pulse" />
+                      ) : (
+                        <button
+                          onClick={() => handleDateClick(day)}
+                          onMouseEnter={() => {
+                            if (calendarSelection === 'checkOut' && startDate && !endDate && !isDisabled) {
+                              setHoverDate(day);
+                            }
+                          }}
+                          onMouseLeave={() => setHoverDate(null)}
+                          disabled={isDisabled}
+                          title={
+                            isTooCloseForCheckout
+                              ? `Minimum stay: ${safeMinStay} night${safeMinStay > 1 ? 's' : ''}`
+                              : isPastMaxCheckout
+                              ? 'Not available for this range'
+                              : undefined
                           }
-                        }}
-                        onMouseLeave={() => setHoverDate(null)}
-                        disabled={isDisabled}
-                        title={
-                          isTooCloseForCheckout
-                            ? `Minimum stay: ${safeMinStay} night${safeMinStay > 1 ? 's' : ''}`
-                            : isPastMaxCheckout
-                            ? 'Not available for this range'
-                            : undefined
-                        }
-                        className={`
-                          relative z-10 w-9 h-9 lg:w-11 lg:h-11 flex items-center justify-center font-bold rounded-full transition-all
-                          ${!isCurrentMonth
-                            ? 'text-transparent cursor-default'
-                            : isPast
-                            ? 'text-gray-300 cursor-not-allowed'
-                            : isUnavailable
-                            ? 'bg-rose-50 text-rose-300 cursor-not-allowed border border-rose-100'
-                            : isTooCloseForCheckout || isPastMaxCheckout
-                            ? 'text-gray-300 cursor-not-allowed'
-                            : 'text-gray-900 hover:bg-gray-100'}
-                          ${(isStart || isEnd) ? 'bg-zinc-900 text-white hover:bg-zinc-900' : ''}
-                          ${isHoverEnd && !isEnd ? 'bg-zinc-700 text-white' : ''}
-                          ${isUnavailable && !(isStart || isEnd) ? 'line-through opacity-80' : ''}
-                        `}
-                      >
-                        {format(day, 'd')}
-                      </button>
+                          className={`
+                            relative z-10 w-9 h-9 lg:w-11 lg:h-11 flex items-center justify-center font-bold rounded-full transition-all
+                            ${!isCurrentMonth
+                              ? 'text-transparent cursor-default'
+                              : isPast
+                              ? 'text-gray-300 cursor-not-allowed'
+                              : isUnavailable
+                              ? 'bg-rose-50 text-rose-300 cursor-not-allowed border border-rose-100'
+                              : isTooCloseForCheckout || isPastMaxCheckout
+                              ? 'text-gray-300 cursor-not-allowed'
+                              : 'text-gray-900 hover:bg-gray-100'}
+                            ${(isStart || isEnd) ? 'bg-zinc-900 text-white hover:bg-zinc-900' : ''}
+                            ${isHoverEnd && !isEnd ? 'bg-zinc-700 text-white' : ''}
+                            ${isUnavailable && !(isStart || isEnd) ? 'line-through opacity-80' : ''}
+                          `}
+                        >
+                          {format(day, 'd')}
+                        </button>
+                      )}
                     </div>
                   );
                 })}
