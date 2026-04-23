@@ -310,7 +310,67 @@ export async function sendRefundRequestToAdmin(req: {
   });
 }
 
-// ─── 6. Cancellation Decision → Guest ────────────────────────────────────────
+// ─── 6. Refund Request Decision → Guest ──────────────────────────────────────
+
+export async function sendRefundRequestDecisionToUser(req: {
+  listingTitle: string;
+  startDate: Date | string;
+  endDate: Date | string;
+  action: 'approved' | 'rejected';
+  adminNote?: string | null;
+  guestName?: string | null;
+  guestEmail: string;
+}) {
+  if (!process.env.RESEND_API_KEY) return;
+
+  const isApproved = req.action === 'approved';
+
+  const html = baseLayout(`
+    <div style="display:inline-block;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700;
+         background:${isApproved ? '#dcfce7' : '#fee2e2'};color:${isApproved ? '#16a34a' : '#dc2626'};margin-bottom:16px;">
+      ${isApproved ? '✓ APPROVED' : '✗ DECLINED'}
+    </div>
+    <h2 style="margin:0 0 8px;font-size:22px;font-weight:800;color:#111827;">
+      ${isApproved ? 'Refund request approved' : 'Refund request declined'}
+    </h2>
+    <p style="margin:0 0 20px;color:#6b7280;font-size:15px;">
+      Hi ${req.guestName || 'there'},
+      ${isApproved
+        ? 'your refund request has been approved. Our team is now processing your refund and you will receive a separate confirmation email once it has been initiated.'
+        : 'after review, we were unable to approve your refund request for the following reservation.'}
+    </p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin:0 0 20px;">
+      ${[
+        ['Property', req.listingTitle],
+        ['Check-in', formatDate(req.startDate)],
+        ['Check-out', formatDate(req.endDate)],
+      ].map(([label, value], i) => `
+      <tr style="background:${i % 2 === 0 ? '#f9fafb' : '#fff'};">
+        <td style="padding:11px 16px;font-size:13px;color:#6b7280;width:130px;">${label}</td>
+        <td style="padding:11px 16px;font-size:13px;color:#111827;">${value}</td>
+      </tr>`).join('')}
+    </table>
+    ${req.adminNote ? `
+    <div style="background:#f9fafb;border-left:3px solid ${BRAND_COLOR};padding:14px 16px;border-radius:0 8px 8px 0;margin-bottom:20px;">
+      <p style="margin:0 0 4px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;">Note from admin</p>
+      <p style="margin:0;font-size:14px;color:#374151;">${req.adminNote}</p>
+    </div>` : ''}
+    <p style="margin:0;font-size:14px;color:#6b7280;">
+      ${isApproved
+        ? 'You will receive another email once the refund has been processed.'
+        : 'If you believe this is an error, please contact us directly.'}
+    </p>
+  `);
+
+  await resend.emails.send({
+    from: FROM,
+    to: req.guestEmail,
+    subject: `Refund Request ${isApproved ? 'Approved' : 'Declined'} — ${req.listingTitle}`,
+    html,
+  });
+}
+
+// ─── 7. Cancellation Decision → Guest ────────────────────────────────────────
 
 export async function sendCancellationDecisionToUser(req: {
   listingTitle: string;

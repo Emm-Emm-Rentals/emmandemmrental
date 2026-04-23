@@ -124,21 +124,34 @@ export default function TaxProfilesPage() {
   };
 
   const handleSave = async () => {
-    setIsSaving(true);
     setError('');
+
+    const validLines = form.lines
+      .map((line, index) => ({
+        label: line.label.trim(),
+        rate: Number(line.rate),
+        appliesTo: line.appliesTo,
+        order: index,
+        isActive: line.isActive,
+      }))
+      .filter((line) => line.label && Number.isFinite(line.rate) && line.rate > 0);
+
+    if (validLines.length === 0) {
+      setError('Add at least one tax line with a label and a rate greater than 0.');
+      return;
+    }
+
+    const invalidLines = form.lines.filter(
+      (line) => line.label.trim() && !(Number(line.rate) > 0)
+    );
+    if (invalidLines.length > 0) {
+      setError('Some tax lines have a missing or zero rate. Please fix them before saving.');
+      return;
+    }
+
+    setIsSaving(true);
     try {
-      const payload = {
-        ...form,
-        lines: form.lines
-          .map((line, index) => ({
-            label: line.label.trim(),
-            rate: Number(line.rate),
-            appliesTo: line.appliesTo,
-            order: index,
-            isActive: line.isActive,
-          }))
-          .filter((line) => line.label && Number.isFinite(line.rate) && line.rate > 0),
-      };
+      const payload = { ...form, lines: validLines };
 
       const response = await fetch(
         selectedId ? `/api/admin/tax-profiles/${selectedId}` : '/api/admin/tax-profiles',
@@ -278,29 +291,41 @@ export default function TaxProfilesPage() {
                 <input
                   value={line.label}
                   onChange={(e) => {
-                    const lines = [...form.lines];
-                    lines[index].label = e.target.value;
-                    setForm((prev) => ({ ...prev, lines }));
+                    const val = e.target.value;
+                    setForm((prev) => ({
+                      ...prev,
+                      lines: prev.lines.map((l, i) => i === index ? { ...l, label: val } : l),
+                    }));
                   }}
-                  placeholder="Tax label"
+                  placeholder="e.g. Florida State Sales Tax"
                   className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 focus:border-slate-900 outline-none"
                 />
-                <input
-                  value={line.rate}
-                  onChange={(e) => {
-                    const lines = [...form.lines];
-                    lines[index].rate = e.target.value;
-                    setForm((prev) => ({ ...prev, lines }));
-                  }}
-                  placeholder="Rate %"
-                  className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 focus:border-slate-900 outline-none"
-                />
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={line.rate}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setForm((prev) => ({
+                        ...prev,
+                        lines: prev.lines.map((l, i) => i === index ? { ...l, rate: val } : l),
+                      }));
+                    }}
+                    placeholder="0.00"
+                    className="w-full h-11 rounded-lg border border-slate-200 bg-white pl-3 pr-8 text-sm text-slate-900 focus:border-slate-900 outline-none"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">%</span>
+                </div>
                 <select
                   value={line.appliesTo}
                   onChange={(e) => {
-                    const lines = [...form.lines];
-                    lines[index].appliesTo = e.target.value as TaxLine['appliesTo'];
-                    setForm((prev) => ({ ...prev, lines }));
+                    const val = e.target.value as TaxLine['appliesTo'];
+                    setForm((prev) => ({
+                      ...prev,
+                      lines: prev.lines.map((l, i) => i === index ? { ...l, appliesTo: val } : l),
+                    }));
                   }}
                   className="h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 focus:border-slate-900 outline-none"
                 >
@@ -311,10 +336,10 @@ export default function TaxProfilesPage() {
                 </select>
                 <button
                   type="button"
-                  onClick={() => {
-                    const lines = form.lines.filter((_, i) => i !== index);
-                    setForm((prev) => ({ ...prev, lines: lines.length > 0 ? lines : [emptyLine(0)] }));
-                  }}
+                  onClick={() => setForm((prev) => {
+                    const lines = prev.lines.filter((_, i) => i !== index);
+                    return { ...prev, lines: lines.length > 0 ? lines : [emptyLine(0)] };
+                  })}
                   className="h-11 rounded-lg border border-red-200 text-red-600 px-3 hover:bg-red-50"
                 >
                   <Trash2 size={14} />

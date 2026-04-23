@@ -4,6 +4,7 @@ import { adminAuthOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { stripe } from "@/lib/stripe";
 import { logAdminAudit } from "@/lib/admin-audit";
+import { sendRefundInitiatedToUser } from "@/lib/email";
 
 export const runtime = "nodejs";
 
@@ -91,6 +92,19 @@ export async function POST(request: NextRequest) {
             amountCents: refundAmount,
             currency: refund.currency,
         });
+
+        const guestEmail = updated.user?.email || reservation.primaryGuestEmail;
+        if (guestEmail) {
+            await sendRefundInitiatedToUser({
+                listingTitle: updated.listing?.title || "Your reservation",
+                startDate: reservation.startDate,
+                endDate: reservation.endDate,
+                refundAmount,
+                currency: refund.currency,
+                guestName: updated.user?.name || reservation.primaryGuestName || null,
+                guestEmail,
+            }).catch(() => {});
+        }
 
         return NextResponse.json({ reservation: updated, refund });
     } catch (error) {

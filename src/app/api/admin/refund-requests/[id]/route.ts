@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { adminAuthOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logAdminAudit } from '@/lib/admin-audit';
+import { sendRefundRequestDecisionToUser } from '@/lib/email';
 
 async function requireAdmin() {
   const session = await getServerSession(adminAuthOptions);
@@ -67,6 +68,19 @@ export async function PATCH(
     userId: existing.userId,
     adminNote: adminNote ?? null,
   });
+
+  const guestEmail = existing.user?.email;
+  if (guestEmail) {
+    await sendRefundRequestDecisionToUser({
+      listingTitle: existing.listingTitle,
+      startDate: existing.startDate,
+      endDate: existing.endDate,
+      action: action === 'approve' ? 'approved' : 'rejected',
+      adminNote: adminNote ?? null,
+      guestName: existing.user?.name ?? null,
+      guestEmail,
+    }).catch(() => {});
+  }
 
   return NextResponse.json({ request: updated });
 }

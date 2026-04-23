@@ -17,19 +17,27 @@ export default async function UpcomingTripsPage() {
 
   const now = new Date();
 
-  const [bookings, pendingRequests] = await Promise.all([
+  const [bookings, cancellationRequests] = await Promise.all([
     getUnifiedReservationsForUser(userId, session?.user?.email),
     prisma.cancellationRequest.findMany({
-      where: { userId, status: 'pending' },
-      select: { reservationId: true, lodgifyReservationId: true },
+      where: { userId, status: { in: ['pending', 'rejected'] } },
+      select: {
+        reservationId: true,
+        lodgifyReservationId: true,
+        status: true,
+        adminNote: true,
+        processedAt: true,
+      },
     }),
   ]);
 
-  // Build a set of reservation IDs that already have a pending request
   const pendingSet = new Set<string>();
-  for (const req of pendingRequests) {
-    if (req.reservationId) pendingSet.add(req.reservationId);
-    if (req.lodgifyReservationId) pendingSet.add(req.lodgifyReservationId);
+  const rejectedMap = new Map<string, { adminNote: string | null; processedAt: Date | null }>();
+  for (const req of cancellationRequests) {
+    const key = req.reservationId || req.lodgifyReservationId;
+    if (!key) continue;
+    if (req.status === 'pending') pendingSet.add(key);
+    else if (req.status === 'rejected') rejectedMap.set(key, { adminNote: req.adminNote, processedAt: req.processedAt });
   }
 
   const upcomingTrips = bookings.filter(
@@ -60,6 +68,12 @@ export default async function UpcomingTripsPage() {
         balanceDueAmount: booking.balanceDueAmount,
         balanceDueDate: booking.balanceDueDate,
         hasPendingCancellation: pendingSet.has(booking.id),
+        rejectedCancellation: rejectedMap.get(booking.id)
+          ? {
+              adminNote: rejectedMap.get(booking.id)!.adminNote,
+              processedAt: rejectedMap.get(booking.id)!.processedAt?.toISOString() ?? null,
+            }
+          : null,
       }))}
     />
   );

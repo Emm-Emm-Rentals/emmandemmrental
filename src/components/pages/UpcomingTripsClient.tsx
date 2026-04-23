@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useUi } from '@/context/UiContext';
-import { X, Calendar, Users, CreditCard, AlertTriangle } from 'lucide-react';
+import { X, XCircle, Calendar, Users, CreditCard, AlertTriangle } from 'lucide-react';
 
 type UpcomingBooking = {
   id: string;
@@ -28,6 +28,7 @@ type UpcomingBooking = {
   balanceDueAmount?: number | null;
   balanceDueDate?: string | null;
   hasPendingCancellation?: boolean;
+  rejectedCancellation?: { adminNote: string | null; processedAt: string | null } | null;
 };
 
 const formatShortDate = (value: string) =>
@@ -117,6 +118,11 @@ function BookingDetailModal({
                     Request Pending
                   </span>
                 )}
+                {!booking.hasPendingCancellation && booking.rejectedCancellation && (
+                  <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-red-50 text-red-600 border border-red-200">
+                    Request Declined
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -204,6 +210,35 @@ function BookingDetailModal({
               </div>
             )}
 
+            {/* Rejected request notice */}
+            {!booking.hasPendingCancellation && booking.rejectedCancellation && (
+              <div className="rounded-2xl border border-red-100 bg-red-50 overflow-hidden">
+                <div className="flex items-center gap-2 px-4 py-3 border-b border-red-100 bg-red-100/60">
+                  <XCircle size={15} className="text-red-500 shrink-0" />
+                  <p className="text-xs font-bold uppercase tracking-wide text-red-600">Cancellation Request Declined</p>
+                  {booking.rejectedCancellation.processedAt && (
+                    <p className="ml-auto text-[10px] text-red-400 shrink-0">
+                      {new Date(booking.rejectedCancellation.processedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </p>
+                  )}
+                </div>
+                <div className="px-4 py-3 space-y-2">
+                  <p className="text-sm text-red-800 leading-relaxed">
+                    After reviewing your request, we were unable to process the cancellation for this reservation. Your booking remains active.
+                  </p>
+                  {booking.rejectedCancellation.adminNote && (
+                    <div className="mt-2 pl-3 border-l-2 border-red-300">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-red-400 mb-0.5">Note from our team</p>
+                      <p className="text-sm text-red-700">{booking.rejectedCancellation.adminNote}</p>
+                    </div>
+                  )}
+                  <p className="text-xs text-red-500 pt-1">
+                    If you have further questions, please contact us directly and we'll be happy to assist.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Block message */}
             {blockMessage && (
               <div className="rounded-2xl px-4 py-3 bg-amber-50 border border-amber-100 text-sm text-amber-700">
@@ -273,7 +308,7 @@ function BookingDetailModal({
                   onClick={() => setShowForm(true)}
                   className="w-full rounded-2xl border border-rose-200 py-3 text-sm font-semibold text-rose-600 hover:bg-rose-50 transition-colors"
                 >
-                  Cancel &amp; Request Refund
+                  {booking.rejectedCancellation ? 'Re-submit Cancellation Request' : 'Cancel & Request Refund'}
                 </button>
               )}
 
@@ -330,7 +365,6 @@ export default function UpcomingTripsClient({
       ]);
 
       const cancelData = await cancelRes.json();
-      const refundData = await refundRes.json();
 
       if (!cancelRes.ok) throw new Error(cancelData.error || 'Failed to submit cancellation request');
 
@@ -411,6 +445,11 @@ export default function UpcomingTripsClient({
                     {booking.hasPendingCancellation && (
                       <div className="text-[11px] text-orange-700 bg-orange-50 border border-orange-100 rounded-xl px-3 py-1.5 font-medium">
                         Request pending
+                      </div>
+                    )}
+                    {!booking.hasPendingCancellation && booking.rejectedCancellation && (
+                      <div className="text-[11px] text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-1.5 font-medium">
+                        Request declined
                       </div>
                     )}
 
