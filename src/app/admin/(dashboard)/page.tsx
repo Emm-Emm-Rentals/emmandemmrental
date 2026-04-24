@@ -14,7 +14,11 @@ import {
     Bar,
 } from 'recharts';
 
-const formatMoney = (cents: number) => {
+const formatMoney = (amount: number) => {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
+};
+
+const formatMoneyCents = (cents: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format((cents || 0) / 100);
 };
 
@@ -57,7 +61,7 @@ export default function AdminDashboard() {
         { label: 'Active Listings', value: data.cards.activeListings, icon: <Home className="text-black" />, tone: 'bg-gray-100' },
         { label: 'Reservations', value: data.cards.totalReservations, icon: <CalendarCheck className="text-black" />, tone: 'bg-gray-100' },
         { label: 'Revenue', value: formatMoney(data.cards.totalRevenue), icon: <DollarSign className="text-black" />, tone: 'bg-gray-100' },
-        { label: 'Refunded', value: formatMoney(data.cards.refundedAmount), icon: <RefreshCcw className="text-black" />, tone: 'bg-gray-100' },
+        { label: 'Refunded', value: formatMoneyCents(data.cards.refundedAmount), icon: <RefreshCcw className="text-black" />, tone: 'bg-gray-100' },
         { label: 'Paid Bookings', value: data.cards.paidCount, icon: <CreditCard className="text-black" />, tone: 'bg-gray-100' },
         { label: 'Refund Count', value: data.cards.refundCount, icon: <RefreshCcw className="text-black" />, tone: 'bg-gray-100' },
     ];
