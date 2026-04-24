@@ -14,8 +14,8 @@ import {
     Bar,
 } from 'recharts';
 
-const formatMoney = (amount: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
+const formatMoney = (cents: number) => {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format((cents || 0) / 100);
 };
 
 const formatShortDate = (value: string) => value.slice(5);
