@@ -13,6 +13,30 @@ const formatMoney = (cents: number, currency = 'usd') => {
     }).format(amount);
 };
 
+const STATUS_STYLES: Record<string, string> = {
+    succeeded: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+    paid: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+    processing: 'bg-amber-50 text-amber-700 border border-amber-200',
+    requires_payment_method: 'bg-rose-50 text-rose-700 border border-rose-200',
+    canceled: 'bg-slate-100 text-slate-600 border border-slate-200',
+};
+
+const REFUND_STYLES: Record<string, string> = {
+    none: 'bg-slate-100 text-slate-500 border border-slate-200',
+    partially_refunded: 'bg-amber-50 text-amber-700 border border-amber-200',
+    refunded: 'bg-rose-50 text-rose-700 border border-rose-200',
+};
+
+function StatusBadge({ value, map }: { value: string; map: Record<string, string> }) {
+    const label = value.replace(/_/g, ' ');
+    const cls = map[value] ?? 'bg-slate-100 text-slate-500 border border-slate-200';
+    return (
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium capitalize ${cls}`}>
+            {label}
+        </span>
+    );
+}
+
 export default function AdminPaymentsPage() {
     const [payments, setPayments] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -77,122 +101,180 @@ export default function AdminPaymentsPage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col gap-2">
-                <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Payments</h1>
-                <p className="text-sm text-slate-500">Track Stripe payments, card details, and refunds.</p>
+            {/* Header */}
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Payments</h1>
+                    <p className="mt-1 text-sm text-slate-500">Track Stripe payments, card details, and refunds.</p>
+                </div>
+                <button
+                    onClick={handleExport}
+                    className="inline-flex items-center gap-2 h-9 px-4 text-sm font-medium rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 shadow-sm transition-colors"
+                >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M12 12v9m0 0l-3-3m3 3l3-3M12 3v9" />
+                    </svg>
+                    Export CSV
+                </button>
             </div>
+
+            {/* Filters */}
             <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-                    <input
-                        value={filters.q}
-                        onChange={(e) => setFilters((prev) => ({ ...prev, q: e.target.value }))}
-                        placeholder="Search by guest, listing, or Payment Intent"
-                        className="flex-1 h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-slate-900 outline-none"
-                    />
-                    <select
-                        value={filters.status}
-                        onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}
-                        className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 focus:bg-white focus:border-slate-900 outline-none"
-                    >
-                        <option value="">Payment status</option>
-                        <option value="succeeded">succeeded</option>
-                        <option value="paid">paid</option>
-                        <option value="processing">processing</option>
-                        <option value="requires_payment_method">requires_payment_method</option>
-                        <option value="canceled">canceled</option>
-                    </select>
-                    <select
-                        value={filters.refundStatus}
-                        onChange={(e) => setFilters((prev) => ({ ...prev, refundStatus: e.target.value }))}
-                        className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 focus:bg-white focus:border-slate-900 outline-none"
-                    >
-                        <option value="">Refund status</option>
-                        <option value="none">none</option>
-                        <option value="partially_refunded">partially_refunded</option>
-                        <option value="refunded">refunded</option>
-                    </select>
-                    <input
-                        type="date"
-                        value={filters.dateFrom}
-                        onChange={(e) => setFilters((prev) => ({ ...prev, dateFrom: e.target.value }))}
-                        className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 focus:bg-white focus:border-slate-900 outline-none"
-                    />
-                    <input
-                        type="date"
-                        value={filters.dateTo}
-                        onChange={(e) => setFilters((prev) => ({ ...prev, dateTo: e.target.value }))}
-                        className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 focus:bg-white focus:border-slate-900 outline-none"
-                    />
-                    <button
-                        onClick={handleExport}
-                        className="h-11 px-4 text-sm font-medium rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
-                    >
-                        Export CSV
-                    </button>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+                    <div className="xl:col-span-2">
+                        <label className="block text-[11px] font-medium text-slate-500 mb-1.5 uppercase tracking-wide">Search</label>
+                        <div className="relative">
+                            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <circle cx="11" cy="11" r="8" /><path strokeLinecap="round" d="M21 21l-4.35-4.35" />
+                            </svg>
+                            <input
+                                value={filters.q}
+                                onChange={(e) => setFilters((prev) => ({ ...prev, q: e.target.value }))}
+                                placeholder="Guest, listing, or Payment Intent…"
+                                className="w-full h-9 pl-9 pr-3 rounded-lg border border-slate-200 bg-slate-50 text-sm text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-slate-400 outline-none transition-colors"
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-[11px] font-medium text-slate-500 mb-1.5 uppercase tracking-wide">Payment Status</label>
+                        <select
+                            value={filters.status}
+                            onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}
+                            className="w-full h-9 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 focus:bg-white focus:border-slate-400 outline-none transition-colors"
+                        >
+                            <option value="">All statuses</option>
+                            <option value="succeeded">Succeeded</option>
+                            <option value="paid">Paid</option>
+                            <option value="processing">Processing</option>
+                            <option value="requires_payment_method">Requires payment</option>
+                            <option value="canceled">Canceled</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-[11px] font-medium text-slate-500 mb-1.5 uppercase tracking-wide">Refund Status</label>
+                        <select
+                            value={filters.refundStatus}
+                            onChange={(e) => setFilters((prev) => ({ ...prev, refundStatus: e.target.value }))}
+                            className="w-full h-9 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 focus:bg-white focus:border-slate-400 outline-none transition-colors"
+                        >
+                            <option value="">All refunds</option>
+                            <option value="none">None</option>
+                            <option value="partially_refunded">Partial</option>
+                            <option value="refunded">Refunded</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-[11px] font-medium text-slate-500 mb-1.5 uppercase tracking-wide">Date Range</label>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="date"
+                                value={filters.dateFrom}
+                                onChange={(e) => setFilters((prev) => ({ ...prev, dateFrom: e.target.value }))}
+                                className="flex-1 h-9 rounded-lg border border-slate-200 bg-slate-50 px-2 text-sm text-slate-900 focus:bg-white focus:border-slate-400 outline-none transition-colors"
+                            />
+                            <span className="text-slate-400 text-xs shrink-0">to</span>
+                            <input
+                                type="date"
+                                value={filters.dateTo}
+                                onChange={(e) => setFilters((prev) => ({ ...prev, dateTo: e.target.value }))}
+                                className="flex-1 h-9 rounded-lg border border-slate-200 bg-slate-50 px-2 text-sm text-slate-900 focus:bg-white focus:border-slate-400 outline-none transition-colors"
+                            />
+                        </div>
+                    </div>
                 </div>
             </div>
 
+            {/* Payment List */}
             {payments.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 py-20 text-center">
+                    <svg className="mx-auto mb-3 w-10 h-10 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+                    </svg>
                     <p className="text-sm font-medium text-slate-500">No payments found.</p>
+                    <p className="text-xs text-slate-400 mt-1">Try adjusting your filters.</p>
                 </div>
             ) : (
-                <div className="space-y-6">
+                <div className="space-y-4">
                     {payments.map((payment) => (
-                        <div key={payment.id} className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                            <div className="flex flex-col lg:flex-row lg:items-center gap-6">
-                                <div className="flex items-center gap-4">
-                                    <img src={payment.listing?.imageSrc} alt={payment.listing?.title} className="w-20 h-16 rounded-lg object-cover" />
-                                    <div>
-                                        <p className="font-medium text-slate-900">{payment.listing?.title}</p>
-                                        <p className="text-xs text-slate-500">{payment.listing?.locationValue}</p>
-                                        <p className="text-xs text-slate-400 mt-1">{formatDate(payment.createdAt)}</p>
+                        <div key={payment.id} className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                            {/* Card top: listing info */}
+                            <div className="flex items-center gap-4 px-5 py-4 border-b border-slate-100">
+                                <img
+                                    src={payment.listing?.imageSrc}
+                                    alt={payment.listing?.title}
+                                    className="w-14 h-11 rounded-lg object-cover shrink-0"
+                                />
+                                <div className="flex-1 min-w-0">
+                                    <p className="font-medium text-slate-900 text-sm truncate">{payment.listing?.title}</p>
+                                    <p className="text-xs text-slate-500 mt-0.5">{payment.listing?.locationValue}</p>
+                                </div>
+                                <p className="text-xs text-slate-400 shrink-0">{formatDate(payment.createdAt)}</p>
+                            </div>
+
+                            {/* Card body: data grid */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-slate-100">
+                                {/* Guest */}
+                                <div className="px-5 py-4">
+                                    <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wide mb-1">Guest</p>
+                                    <p className="text-sm font-medium text-slate-900 truncate">{payment.user?.name || 'Guest'}</p>
+                                    <p className="text-xs text-slate-500 truncate">{payment.user?.email}</p>
+                                </div>
+
+                                {/* Payment */}
+                                <div className="px-5 py-4">
+                                    <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wide mb-1">Amount</p>
+                                    <p className="text-sm font-semibold text-slate-900">
+                                        {payment.amountPaid
+                                            ? formatMoney(payment.amountPaid, payment.paymentCurrency)
+                                            : `$${payment.totalPrice?.toFixed(2)}`}
+                                    </p>
+                                    <div className="mt-1">
+                                        <StatusBadge value={payment.paymentStatus || 'unpaid'} map={STATUS_STYLES} />
                                     </div>
                                 </div>
-                                <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                    <div>
-                                        <p className="text-xs text-slate-500">Guest</p>
-                                        <p className="font-medium text-slate-900">{payment.user?.name || 'Guest'}</p>
-                                        <p className="text-xs text-slate-500">{payment.user?.email}</p>
+
+                                {/* Card */}
+                                <div className="px-5 py-4">
+                                    <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wide mb-1">Card</p>
+                                    <p className="text-sm text-slate-900">
+                                        {payment.cardBrand && payment.cardLast4
+                                            ? `${payment.cardBrand.toUpperCase()} •••• ${payment.cardLast4}`
+                                            : <span className="text-slate-400">Unavailable</span>}
+                                    </p>
+                                    <p className="text-xs text-slate-500 mt-0.5">
+                                        {payment.cardExpMonth && payment.cardExpYear
+                                            ? `Exp ${payment.cardExpMonth}/${String(payment.cardExpYear).slice(-2)}`
+                                            : ''}
+                                    </p>
+                                </div>
+
+                                {/* Refund */}
+                                <div className="px-5 py-4">
+                                    <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wide mb-1">Refund</p>
+                                    <div className="mb-1">
+                                        <StatusBadge value={payment.refundStatus || 'none'} map={REFUND_STYLES} />
                                     </div>
-                                    <div>
-                                        <p className="text-xs text-slate-500">Payment</p>
-                                        <p className="font-medium text-slate-900">
-                                            {payment.amountPaid ? formatMoney(payment.amountPaid, payment.paymentCurrency) : `$${payment.totalPrice.toFixed(2)}`}
-                                        </p>
-                                        <p className="text-xs text-slate-500">{payment.paymentStatus || 'unpaid'}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs text-slate-500">Card</p>
-                                        <p className="text-sm text-slate-900">
-                                            {payment.cardBrand && payment.cardLast4
-                                                ? `${payment.cardBrand.toUpperCase()} •••• ${payment.cardLast4}`
-                                                : 'Unavailable'}
-                                        </p>
-                                        <p className="text-xs text-slate-500">
-                                            {payment.cardExpMonth && payment.cardExpYear ? `exp ${payment.cardExpMonth}/${String(payment.cardExpYear).slice(-2)}` : ''}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs text-slate-500">Refunds</p>
-                                        <p className="text-sm text-slate-900">{payment.refundStatus || 'none'}</p>
-                                        <p className="text-xs text-slate-500">
-                                            {payment.refundedAmount ? formatMoney(payment.refundedAmount, payment.paymentCurrency) : ''}
-                                        </p>
-                                    </div>
+                                    <p className="text-xs text-slate-500">
+                                        {payment.refundedAmount
+                                            ? formatMoney(payment.refundedAmount, payment.paymentCurrency)
+                                            : ''}
+                                    </p>
                                 </div>
                             </div>
 
+                            {/* Refund history (collapsible section) */}
                             {payment.refundHistory?.length > 0 && (
-                                <div className="mt-5 border-t border-slate-200 pt-4">
-                                    <p className="text-[11px] font-medium text-slate-500 uppercase tracking-[0.18em] mb-3">Refund History</p>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="px-5 pb-4 border-t border-slate-100 pt-4 bg-slate-50/60">
+                                    <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wide mb-3">Refund History</p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                         {payment.refundHistory.map((refund: any) => (
-                                            <div key={refund.id} className="rounded-lg border border-slate-200 p-3 text-sm">
-                                                <p className="font-medium text-slate-900">{refund.id}</p>
-                                                <p className="text-xs text-slate-500">Amount: {formatMoney(refund.amount, refund.currency)}</p>
-                                                <p className="text-xs text-slate-500">Status: {refund.status}</p>
-                                                <p className="text-xs text-slate-400">Date: {formatDate(new Date(refund.created * 1000).toISOString())}</p>
+                                            <div key={refund.id} className="rounded-lg border border-slate-200 bg-white p-3 text-sm">
+                                                <p className="font-mono text-xs text-slate-600 truncate mb-1">{refund.id}</p>
+                                                <div className="flex items-center justify-between text-xs text-slate-500">
+                                                    <span>{formatMoney(refund.amount, refund.currency)}</span>
+                                                    <span className="capitalize">{refund.status}</span>
+                                                    <span>{formatDate(new Date(refund.created * 1000).toISOString())}</span>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
@@ -203,25 +285,33 @@ export default function AdminPaymentsPage() {
                 </div>
             )}
 
+            {/* Pagination */}
             {total > 0 && (
-                <div className="mt-8 flex items-center justify-between">
+                <div className="flex items-center justify-between pt-2">
                     <p className="text-sm text-slate-500">
-                        Showing page {page} of {totalPages} · {total} total payments
+                        Page <span className="font-medium text-slate-700">{page}</span> of <span className="font-medium text-slate-700">{totalPages}</span>
+                        <span className="text-slate-400"> · {total} payments</span>
                     </p>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                         <button
                             onClick={() => setPage((p) => Math.max(1, p - 1))}
                             disabled={page === 1}
-                            className="px-3 py-2 text-xs font-medium border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50"
+                            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                         >
-                            Previous
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                            </svg>
+                            Prev
                         </button>
                         <button
                             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                             disabled={page >= totalPages}
-                            className="px-3 py-2 text-xs font-medium border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50"
+                            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                         >
                             Next
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                            </svg>
                         </button>
                     </div>
                 </div>
